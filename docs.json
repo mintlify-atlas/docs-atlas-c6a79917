@@ -1,122 +1,135 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "WooCommerce",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#843cfb",
+    "light": "#c49cf2",
+    "dark": "#843cfb"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/b13a5aa5-06b9-4404-82af-e5b7cc58dde9.jpg",
+  "logo": {
+    "light": "https://media.brand.dev/bc2aac19-b9d7-4f00-a963-2cba08411501.svg",
+    "dark": "https://media.brand.dev/bc2aac19-b9d7-4f00-a963-2cba08411501.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/woocommerce/woocommerce"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/woocommerce/woocommerce"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Getting Started",
             "pages": [
-              "index",
+              "introduction",
               "quickstart",
-              "development"
+              "development-environment",
+              "project-structure"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Core Concepts",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
+              "core-concepts/architecture",
+              "core-concepts/monorepo",
+              "core-concepts/modern-vs-legacy",
+              "core-concepts/dependency-injection"
             ]
           },
           {
-            "group": "Writing content",
+            "group": "Extension Development",
             "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
+              "extensions/getting-started",
+              "extensions/first-extension",
+              "extensions/best-practices",
+              "extensions/settings-api",
+              "extensions/hooks-filters"
             ]
           },
           {
-            "group": "AI tools",
+            "group": "Theme Development",
             "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "themes/overview",
+              "themes/classic-themes",
+              "themes/block-themes",
+              "themes/customization"
+            ]
+          },
+          {
+            "group": "Block Development",
+            "pages": [
+              "blocks/getting-started",
+              "blocks/extensible-blocks",
+              "blocks/tutorials"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/payments",
+              "features/shipping",
+              "features/analytics",
+              "features/hpos",
+              "features/email"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "REST API",
             "pages": [
-              "api-reference/introduction"
+              "api/rest-api/overview",
+              "api/rest-api/authentication",
+              "api/rest-api/products",
+              "api/rest-api/orders",
+              "api/rest-api/customers"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Store API",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "api/store-api/overview",
+              "api/store-api/cart",
+              "api/store-api/checkout"
+            ]
+          },
+          {
+            "group": "PHP APIs",
+            "pages": [
+              "api/php/payment-gateway-api",
+              "api/php/shipping-method-api",
+              "api/php/payment-token-api"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Contribution Guide",
+            "pages": [
+              "contributing/overview",
+              "contributing/coding-standards",
+              "contributing/testing",
+              "contributing/git-workflow"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

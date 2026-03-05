@@ -1,0 +1,594 @@
+---
+title: WooCommerce Settings API
+description: Learn how to use the WooCommerce Settings API to add settings pages, tabs, and fields to your extension with validation and sanitization
+---
+
+# WooCommerce Settings API
+
+The WooCommerce Settings API provides a standardized way to add settings pages and fields to your extension. It handles form generation, validation, sanitization, and saving, allowing you to focus on your extension's functionality.
+
+## Overview
+
+The Settings API is used throughout WooCommerce for:
+
+- Payment gateways
+- Shipping methods
+- Integration settings
+- General WooCommerce settings pages
+
+By using the Settings API, your extension will have a consistent look and feel with WooCommerce core.
+
+## When to use the Settings API
+
+Use the Settings API when you need to:
+
+- Add a settings page to the WooCommerce settings area
+- Create settings for a payment gateway or shipping method
+- Build an integration with external services
+- Add configurable options to your extension
+
+The Settings API is found in `plugins/woocommerce/includes/abstracts/abstract-wc-settings-api.php`.
+
+## Basic implementation
+
+To use the Settings API, your class should extend `WC_Settings_API`.
+
+### Simple example
+
+Here's a basic example of a class using the Settings API:
+
+```php
+class WC_MyExtension_Settings extends WC_Settings_API {
+    
+    /**
+     * Constructor
+     */
+    public function __construct() {
+        $this->id = 'myextension';
+        $this->plugin_id = 'wc_myextension_';
+        
+        // Initialize form fields
+        $this->init_form_fields();
+        
+        // Load settings
+        $this->init_settings();
+        
+        // Save settings
+        add_action( 'woocommerce_update_options_myextension', array( $this, 'process_admin_options' ) );
+    }
+    
+    /**
+     * Initialize form fields
+     */
+    public function init_form_fields() {
+        $this->form_fields = array(
+            'enabled' => array(
+                'title'   => __( 'Enable/Disable', 'woocommerce-myextension' ),
+                'type'    => 'checkbox',
+                'label'   => __( 'Enable this feature', 'woocommerce-myextension' ),
+                'default' => 'yes',
+            ),
+            'api_key' => array(
+                'title'       => __( 'API Key', 'woocommerce-myextension' ),
+                'type'        => 'text',
+                'description' => __( 'Enter your API key', 'woocommerce-myextension' ),
+                'default'     => '',
+                'desc_tip'    => true,
+            ),
+        );
+    }
+}
+```
+
+## Form field types
+
+The Settings API supports various field types. These are defined as constants in `WC_Settings_Page`:
+
+### Text input types
+
+```php
+'api_key' => array(
+    'title'       => __( 'API Key', 'woocommerce-myextension' ),
+    'type'        => 'text',
+    'description' => __( 'Your API key from the provider', 'woocommerce-myextension' ),
+    'default'     => '',
+    'desc_tip'    => true,
+    'placeholder' => __( 'Enter API key', 'woocommerce-myextension' ),
+),
+
+'password' => array(
+    'title'       => __( 'Password', 'woocommerce-myextension' ),
+    'type'        => 'password',
+    'description' => __( 'Your account password', 'woocommerce-myextension' ),
+),
+
+'email' => array(
+    'title'       => __( 'Email Address', 'woocommerce-myextension' ),
+    'type'        => 'email',
+    'description' => __( 'Email for notifications', 'woocommerce-myextension' ),
+),
+
+'number' => array(
+    'title'       => __( 'Quantity', 'woocommerce-myextension' ),
+    'type'        => 'number',
+    'description' => __( 'Number of items', 'woocommerce-myextension' ),
+    'default'     => 10,
+    'custom_attributes' => array(
+        'min'  => 1,
+        'max'  => 100,
+        'step' => 1,
+    ),
+),
+```
+
+### Textarea
+
+```php
+'description' => array(
+    'title'       => __( 'Description', 'woocommerce-myextension' ),
+    'type'        => 'textarea',
+    'description' => __( 'Enter a description', 'woocommerce-myextension' ),
+    'default'     => '',
+    'css'         => 'width: 400px; height: 100px;',
+),
+```
+
+### Checkbox
+
+```php
+'enabled' => array(
+    'title'   => __( 'Enable/Disable', 'woocommerce-myextension' ),
+    'type'    => 'checkbox',
+    'label'   => __( 'Enable this feature', 'woocommerce-myextension' ),
+    'default' => 'yes',
+),
+```
+
+### Select dropdown
+
+```php
+'mode' => array(
+    'title'       => __( 'Mode', 'woocommerce-myextension' ),
+    'type'        => 'select',
+    'description' => __( 'Select the operating mode', 'woocommerce-myextension' ),
+    'default'     => 'live',
+    'options'     => array(
+        'test' => __( 'Test Mode', 'woocommerce-myextension' ),
+        'live' => __( 'Live Mode', 'woocommerce-myextension' ),
+    ),
+),
+```
+
+### Multiselect
+
+```php
+'allowed_countries' => array(
+    'title'       => __( 'Allowed Countries', 'woocommerce-myextension' ),
+    'type'        => 'multiselect',
+    'description' => __( 'Select allowed countries', 'woocommerce-myextension' ),
+    'default'     => array(),
+    'options'     => array(
+        'US' => __( 'United States', 'woocommerce-myextension' ),
+        'CA' => __( 'Canada', 'woocommerce-myextension' ),
+        'GB' => __( 'United Kingdom', 'woocommerce-myextension' ),
+    ),
+    'class'       => 'wc-enhanced-select',
+),
+```
+
+### Section title and description
+
+```php
+'section_title' => array(
+    'title'       => __( 'API Settings', 'woocommerce-myextension' ),
+    'type'        => 'title',
+    'description' => __( 'Configure your API connection settings below.', 'woocommerce-myextension' ),
+),
+
+// ... other fields ...
+
+'section_end' => array(
+    'type' => 'sectionend',
+),
+```
+
+## Complete settings page example
+
+Here's a comprehensive example showing how to create a full settings page:
+
+```php
+class WC_MyExtension_Settings extends WC_Settings_API {
+    
+    /**
+     * Constructor
+     */
+    public function __construct() {
+        $this->id = 'myextension';
+        $this->plugin_id = 'wc_myextension_';
+        
+        // Initialize form fields
+        $this->init_form_fields();
+        
+        // Load settings
+        $this->init_settings();
+        
+        // Define user set variables
+        $this->enabled = $this->get_option( 'enabled' );
+        $this->api_key = $this->get_option( 'api_key' );
+        $this->api_secret = $this->get_option( 'api_secret' );
+        $this->test_mode = $this->get_option( 'test_mode' );
+        
+        // Actions
+        add_action( 'woocommerce_update_options_myextension', array( $this, 'process_admin_options' ) );
+        add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
+    }
+    
+    /**
+     * Add settings page to WooCommerce menu
+     */
+    public function add_settings_page() {
+        add_submenu_page(
+            'woocommerce',
+            __( 'My Extension Settings', 'woocommerce-myextension' ),
+            __( 'My Extension', 'woocommerce-myextension' ),
+            'manage_woocommerce',
+            'wc-myextension-settings',
+            array( $this, 'settings_page_html' )
+        );
+    }
+    
+    /**
+     * Settings page HTML
+     */
+    public function settings_page_html() {
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e( 'My Extension Settings', 'woocommerce-myextension' ); ?></h1>
+            <form method="post" action="">
+                <?php
+                $this->admin_options();
+                wp_nonce_field( 'wc_myextension_settings' );
+                ?>
+                <?php submit_button(); ?>
+            </form>
+        </div>
+        <?php
+    }
+    
+    /**
+     * Initialize form fields
+     */
+    public function init_form_fields() {
+        $this->form_fields = array(
+            'general_section' => array(
+                'title'       => __( 'General Settings', 'woocommerce-myextension' ),
+                'type'        => 'title',
+                'description' => __( 'Configure general extension settings.', 'woocommerce-myextension' ),
+            ),
+            'enabled' => array(
+                'title'   => __( 'Enable/Disable', 'woocommerce-myextension' ),
+                'type'    => 'checkbox',
+                'label'   => __( 'Enable My Extension', 'woocommerce-myextension' ),
+                'default' => 'yes',
+            ),
+            'test_mode' => array(
+                'title'   => __( 'Test Mode', 'woocommerce-myextension' ),
+                'type'    => 'checkbox',
+                'label'   => __( 'Enable test mode', 'woocommerce-myextension' ),
+                'default' => 'no',
+                'description' => __( 'Use test API credentials', 'woocommerce-myextension' ),
+            ),
+            'general_section_end' => array(
+                'type' => 'sectionend',
+            ),
+            'api_section' => array(
+                'title'       => __( 'API Credentials', 'woocommerce-myextension' ),
+                'type'        => 'title',
+                'description' => __( 'Enter your API credentials.', 'woocommerce-myextension' ),
+            ),
+            'api_key' => array(
+                'title'       => __( 'API Key', 'woocommerce-myextension' ),
+                'type'        => 'text',
+                'description' => __( 'Get your API key from your account dashboard.', 'woocommerce-myextension' ),
+                'default'     => '',
+                'desc_tip'    => true,
+            ),
+            'api_secret' => array(
+                'title'       => __( 'API Secret', 'woocommerce-myextension' ),
+                'type'        => 'password',
+                'description' => __( 'Your API secret key.', 'woocommerce-myextension' ),
+                'default'     => '',
+                'desc_tip'    => true,
+            ),
+            'api_section_end' => array(
+                'type' => 'sectionend',
+            ),
+        );
+    }
+    
+    /**
+     * Validate API key field
+     *
+     * @param string $key   Field key
+     * @param string $value Posted value
+     * @return string
+     */
+    public function validate_api_key_field( $key, $value ) {
+        $value = sanitize_text_field( $value );
+        
+        // Custom validation
+        if ( strlen( $value ) < 20 ) {
+            WC_Admin_Settings::add_error( __( 'API key must be at least 20 characters.', 'woocommerce-myextension' ) );
+        }
+        
+        return $value;
+    }
+}
+
+// Initialize settings
+new WC_MyExtension_Settings();
+```
+
+## Adding settings to WooCommerce settings tabs
+
+To add your settings to the main WooCommerce settings area, extend `WC_Settings_Page` instead:
+
+```php
+class WC_Settings_MyExtension extends WC_Settings_Page {
+    
+    /**
+     * Constructor
+     */
+    public function __construct() {
+        $this->id    = 'myextension';
+        $this->label = __( 'My Extension', 'woocommerce-myextension' );
+        
+        parent::__construct();
+    }
+    
+    /**
+     * Get settings array
+     *
+     * @return array
+     */
+    public function get_settings() {
+        $settings = array(
+            array(
+                'title' => __( 'My Extension Settings', 'woocommerce-myextension' ),
+                'type'  => 'title',
+                'desc'  => __( 'Configure your extension settings below.', 'woocommerce-myextension' ),
+                'id'    => 'myextension_options',
+            ),
+            array(
+                'title'   => __( 'Enable Extension', 'woocommerce-myextension' ),
+                'desc'    => __( 'Enable the extension features', 'woocommerce-myextension' ),
+                'id'      => 'wc_myextension_enabled',
+                'default' => 'yes',
+                'type'    => 'checkbox',
+            ),
+            array(
+                'title'       => __( 'API Key', 'woocommerce-myextension' ),
+                'desc'        => __( 'Enter your API key', 'woocommerce-myextension' ),
+                'id'          => 'wc_myextension_api_key',
+                'type'        => 'text',
+                'default'     => '',
+                'desc_tip'    => true,
+            ),
+            array(
+                'type' => 'sectionend',
+                'id'   => 'myextension_options',
+            ),
+        );
+        
+        return apply_filters( 'woocommerce_get_settings_myextension', $settings );
+    }
+}
+
+// Register the settings page
+add_filter( 'woocommerce_get_settings_pages', function( $settings ) {
+    $settings[] = new WC_Settings_MyExtension();
+    return $settings;
+} );
+```
+
+## Custom validation and sanitization
+
+You can add custom validation for specific fields by creating a `validate_{field_id}_field` method:
+
+```php
+/**
+ * Validate email field
+ *
+ * @param string $key   Field key
+ * @param string $value Posted value
+ * @return string
+ */
+public function validate_notification_email_field( $key, $value ) {
+    $value = sanitize_email( $value );
+    
+    if ( ! is_email( $value ) ) {
+        WC_Admin_Settings::add_error( 
+            __( 'Please enter a valid email address.', 'woocommerce-myextension' ) 
+        );
+    }
+    
+    return $value;
+}
+
+/**
+ * Validate URL field
+ *
+ * @param string $key   Field key
+ * @param string $value Posted value
+ * @return string
+ */
+public function validate_webhook_url_field( $key, $value ) {
+    $value = esc_url_raw( $value );
+    
+    if ( ! filter_var( $value, FILTER_VALIDATE_URL ) ) {
+        WC_Admin_Settings::add_error( 
+            __( 'Please enter a valid URL.', 'woocommerce-myextension' ) 
+        );
+    }
+    
+    return $value;
+}
+```
+
+## Getting and updating settings
+
+### Get a setting value
+
+```php
+// Using the Settings API class
+$api_key = $this->get_option( 'api_key' );
+
+// Using WordPress options directly
+$api_key = get_option( 'wc_myextension_api_key' );
+```
+
+### Update a setting value
+
+```php
+// Update a single setting
+update_option( 'wc_myextension_api_key', $new_api_key );
+
+// Update multiple settings
+$settings = get_option( $this->get_option_key() );
+$settings['api_key'] = $new_api_key;
+$settings['api_secret'] = $new_secret;
+update_option( $this->get_option_key(), $settings );
+```
+
+## Field attributes and options
+
+Common field attributes:
+
+```php
+array(
+    'title'             => '',  // Field title
+    'type'              => '',  // Field type (text, checkbox, select, etc.)
+    'description'       => '',  // Help text shown below the field
+    'desc_tip'          => false, // Show description as tooltip (true/false)
+    'default'           => '',  // Default value
+    'placeholder'       => '',  // Placeholder text
+    'class'             => '',  // CSS class for the field
+    'css'               => '',  // Inline CSS
+    'custom_attributes' => array(), // Custom HTML attributes
+    'options'           => array(), // Options for select/multiselect
+    'sanitize_callback' => null, // Custom sanitization function
+)
+```
+
+## Best practices
+
+<Note>
+Always use proper escaping and sanitization when working with settings data.
+</Note>
+
+### Security
+
+1. **Sanitize input**: Always sanitize user input before saving
+2. **Validate data**: Validate data types and formats
+3. **Escape output**: Always escape output when displaying
+4. **Use nonces**: Protect forms with WordPress nonces
+
+### Usability
+
+1. **Use `desc_tip`**: Keep the interface clean by using tooltips for help text
+2. **Group related settings**: Use sections to organize settings logically
+3. **Provide defaults**: Always set sensible default values
+4. **Use placeholders**: Help users understand expected input format
+5. **Clear labels**: Use descriptive titles and labels
+
+### Performance
+
+1. **Cache settings**: Don't query options repeatedly
+2. **Use transients**: Cache expensive API calls
+3. **Minimize autoloaded options**: Don't autoload large settings
+
+```php
+// Cache settings in class property
+private $settings;
+
+public function get_settings() {
+    if ( null === $this->settings ) {
+        $this->settings = get_option( $this->get_option_key() );
+    }
+    return $this->settings;
+}
+```
+
+## Real-world example: Payment gateway settings
+
+Here's how payment gateways use the Settings API:
+
+```php
+class WC_Gateway_MyPayment extends WC_Payment_Gateway {
+    
+    public function __construct() {
+        $this->id                 = 'mypayment';
+        $this->method_title       = __( 'My Payment Gateway', 'woocommerce-myextension' );
+        $this->method_description = __( 'Accept payments via My Payment Gateway', 'woocommerce-myextension' );
+        $this->has_fields         = false;
+        
+        // Load settings
+        $this->init_form_fields();
+        $this->init_settings();
+        
+        // Get setting values
+        $this->title       = $this->get_option( 'title' );
+        $this->description = $this->get_option( 'description' );
+        $this->enabled     = $this->get_option( 'enabled' );
+        $this->testmode    = 'yes' === $this->get_option( 'testmode' );
+        
+        // Save settings
+        add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
+    }
+    
+    public function init_form_fields() {
+        $this->form_fields = array(
+            'enabled' => array(
+                'title'   => __( 'Enable/Disable', 'woocommerce-myextension' ),
+                'type'    => 'checkbox',
+                'label'   => __( 'Enable My Payment Gateway', 'woocommerce-myextension' ),
+                'default' => 'yes',
+            ),
+            'title' => array(
+                'title'       => __( 'Title', 'woocommerce-myextension' ),
+                'type'        => 'text',
+                'description' => __( 'Payment method title shown during checkout.', 'woocommerce-myextension' ),
+                'default'     => __( 'Credit Card', 'woocommerce-myextension' ),
+                'desc_tip'    => true,
+            ),
+            'description' => array(
+                'title'       => __( 'Description', 'woocommerce-myextension' ),
+                'type'        => 'textarea',
+                'description' => __( 'Payment method description shown during checkout.', 'woocommerce-myextension' ),
+                'default'     => __( 'Pay securely with your credit card.', 'woocommerce-myextension' ),
+            ),
+            'testmode' => array(
+                'title'   => __( 'Test Mode', 'woocommerce-myextension' ),
+                'type'    => 'checkbox',
+                'label'   => __( 'Enable test mode', 'woocommerce-myextension' ),
+                'default' => 'yes',
+            ),
+        );
+    }
+}
+```
+
+## Next steps
+
+Now that you understand the Settings API:
+
+1. Learn about [WooCommerce hooks and filters](/docs/extensions/hooks-filters)
+2. Review [extension development best practices](/docs/extensions/best-practices)
+3. Study the [WooCommerce Settings API source code](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/abstracts/abstract-wc-settings-api.php)
+4. Explore existing payment gateway and shipping method implementations
+
+## Additional resources
+
+- [WooCommerce Code Reference](https://woocommerce.com/wc-apidocs/)
+- [WordPress Settings API](https://developer.wordpress.org/plugins/settings/)
+- [WooCommerce Admin Settings Class](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/admin/class-wc-admin-settings.php)

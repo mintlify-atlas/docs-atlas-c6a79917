@@ -1,0 +1,358 @@
+---
+title: Store API Overview
+description: Introduction to the WooCommerce Store API for building headless e-commerce applications
+---
+
+# Store API Overview
+
+The WooCommerce Store API provides public REST API endpoints for building customer-facing cart, checkout, and product functionality. It follows many of the patterns used in the [WordPress REST API](https://developer.wordpress.org/rest-api/key-concepts/) and is specifically designed for unauthenticated, client-side interactions.
+
+## What is the Store API?
+
+The Store API is an **unauthenticated REST API** that allows developers to build modern, headless e-commerce experiences with WooCommerce. Unlike the WooCommerce REST API (which requires authentication), the Store API is designed to be called directly from frontend applications without exposing sensitive store data or customer information.
+
+<Note>
+The Store API is read-only for most operations and only allows modifications to the current user's cart and checkout session. It cannot be used to access other customers' data or modify store settings.
+</Note>
+
+## Key Features
+
+### Unauthenticated Access
+
+The Store API does not require API keys or authentication tokens for most endpoints. This makes it ideal for:
+
+- Single Page Applications (SPAs)
+- Progressive Web Apps (PWAs)
+- Headless commerce implementations
+- Mobile applications
+- Custom storefronts
+
+### Session-Based Cart Management
+
+Customer sessions in WooCommerce are cookie-based by default, but the Store API also supports headless implementations using [Cart Tokens](/api/store-api/cart#cart-tokens) for session management without cookies.
+
+### Modern REST Patterns
+
+- JSON-formatted responses
+- Well-defined schemas
+- Predictable error handling
+- Standard HTTP status codes
+- Pagination for large datasets
+
+## Use Cases
+
+The Store API is designed for building customer-facing commerce experiences:
+
+1. **Product Discovery** - Obtain filtered and searchable product lists with rich metadata
+2. **Cart Management** - Add products to cart, update quantities, apply coupons, and calculate shipping
+3. **Checkout Flow** - Collect customer addresses, select shipping methods, and process payments
+4. **Order Completion** - Convert carts to orders and handle payment processing
+
+## API Namespace
+
+All Store API resources are found within the `wc/store/v1` namespace. Since this API extends the WordPress API, accessing it requires the `/wp-json/` base.
+
+```http
+GET /wp-json/wc/store/v1/products
+GET /wp-json/wc/store/v1/cart
+POST /wp-json/wc/store/v1/checkout
+```
+
+<Note>
+Currently, `v1` is the only available version. If the version is omitted from the URL, `v1` will be served by default.
+</Note>
+
+## Quick Start
+
+Here's a simple example of fetching products from the Store API:
+
+```bash
+curl "https://example-store.com/wp-json/wc/store/v1/products"
+```
+
+```json Response
+{
+  "id": 25,
+  "name": "Vintage Denim Jacket",
+  "slug": "vintage-denim-jacket",
+  "permalink": "https://example-store.com/product/vintage-denim-jacket/",
+  "type": "simple",
+  "description": "Classic vintage-style denim jacket...",
+  "short_description": "Timeless style meets comfort",
+  "sku": "VDJ-001",
+  "prices": {
+    "price": "8999",
+    "regular_price": "12999",
+    "sale_price": "8999",
+    "currency_code": "USD",
+    "currency_symbol": "$",
+    "currency_minor_unit": 2
+  },
+  "images": [
+    {
+      "id": 142,
+      "src": "https://example-store.com/wp-content/uploads/jacket.jpg",
+      "thumbnail": "https://example-store.com/wp-content/uploads/jacket-450x450.jpg",
+      "name": "jacket.jpg",
+      "alt": "Vintage Denim Jacket"
+    }
+  ],
+  "categories": [
+    {
+      "id": 9,
+      "name": "Clothing",
+      "slug": "clothing"
+    }
+  ]
+}
+```
+
+## Available Endpoints
+
+The Store API provides endpoints for all major e-commerce operations:
+
+| Resource | Endpoints | Description |
+|----------|-----------|-------------|
+| **Cart** | `/wc/store/v1/cart` | Get cart, add items, update quantities, manage coupons |
+| **Checkout** | `/wc/store/v1/checkout` | Process checkout and create orders |
+| **Products** | `/wc/store/v1/products` | List and search products |
+| **Product Categories** | `/wc/store/v1/products/categories` | Browse product categories |
+| **Product Attributes** | `/wc/store/v1/products/attributes` | Get product attributes and terms |
+| **Product Reviews** | `/wc/store/v1/products/reviews` | Read product reviews |
+| **Order** | `/wc/store/v1/order/:id` | Retrieve order details (current user only) |
+
+## Authentication & Security
+
+### Nonce Tokens
+
+While most GET requests don't require authentication, operations that modify data (POST, PUT, DELETE) require a **Nonce Token** for security:
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  https://example-store.com/wp-json/wc/store/v1/cart/add-item?id=100&quantity=1
+```
+
+Nonces are generated using WordPress's `wp_create_nonce()` function:
+
+```php
+$nonce = wp_create_nonce( 'wc_store_api' );
+```
+
+<Note>
+After each request, an updated `Nonce` header is returned in the response. Your application must store and use this updated nonce for subsequent requests.
+</Note>
+
+### Cart Tokens
+
+For headless implementations without cookies, use **Cart Tokens** instead of nonces:
+
+```bash
+curl --header "Cart-Token: eyJhbGciOiJIUzI1..." \
+  --request GET \
+  https://example-store.com/wp-json/wc/store/v1/cart
+```
+
+Cart Tokens are returned in the `Cart-Token` response header when making cart requests. Learn more in the [Cart API documentation](/api/store-api/cart).
+
+## Requirements and Limitations
+
+<Warning>
+The Store API is designed for customer-facing operations only. It has important security limitations:
+</Warning>
+
+- **Unauthenticated access** - No API keys or OAuth required
+- **Current user only** - Can only access data for the current session/user
+- **No admin operations** - Cannot modify store settings or access admin data
+- **Cookie-based sessions** - Uses WordPress cookies by default (Cart Tokens available for headless)
+- **Nonce required** - Write operations require valid nonce tokens or cart tokens
+
+For administrative operations or accessing other customers' data, use the authenticated [WooCommerce REST API](https://woocommerce.github.io/woocommerce-rest-api-docs/).
+
+## Pagination
+
+Endpoints that return collections support pagination parameters:
+
+| Parameter | Description | Default | Maximum |
+|-----------|-------------|---------|---------|
+| `page` | Current page number | `1` | - |
+| `per_page` | Items per page | `10` | `100` |
+
+```bash
+curl "https://example-store.com/wp-json/wc/store/v1/products?page=2&per_page=20"
+```
+
+Pagination information is returned in response headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-WP-Total` | Total number of items in the collection |
+| `X-WP-TotalPages` | Total number of pages available |
+| `Link` | Links to next, previous, and collection pages |
+
+## HTTP Status Codes
+
+The Store API uses standard HTTP status codes:
+
+| Status Code | Description |
+|-------------|-------------|
+| `200 OK` | Successful GET or PUT request |
+| `201 Created` | Resource successfully created (POST) |
+| `204 No Content` | Resource successfully deleted |
+| `400 Bad Request` | Missing required parameter or invalid input |
+| `403 Forbidden` | Invalid nonce or unauthorized request |
+| `404 Not Found` | Resource does not exist |
+| `409 Conflict` | Request conflicts with current state (includes updated cart data) |
+| `500 Server Error` | Internal server error |
+
+## Error Handling
+
+Error responses follow a consistent format:
+
+```json
+{
+  "code": "woocommerce_rest_cart_invalid_product",
+  "message": "This product cannot be added to the cart.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+For conflict errors (409), the response includes the current cart state:
+
+```json
+{
+  "code": "woocommerce_rest_cart_invalid_key",
+  "message": "Cart item no longer exists or is invalid.",
+  "data": {
+    "status": 409,
+    "cart": {
+      "items": [],
+      "totals": { ... }
+    }
+  }
+}
+```
+
+This allows your application to stay synchronized with the server state without additional requests.
+
+## Headless Commerce
+
+The Store API is ideal for building headless commerce applications:
+
+### Benefits
+
+- **Framework agnostic** - Use with React, Vue, Angular, or any JavaScript framework
+- **Mobile-friendly** - Perfect for iOS, Android, and cross-platform mobile apps
+- **Performance** - Client-side rendering with API-driven data
+- **Flexibility** - Complete control over UI/UX
+
+### Example: React + Store API
+
+```javascript
+import { useState, useEffect } from 'react';
+
+function ProductList() {
+  const [products, setProducts] = useState([]);
+  
+  useEffect(() => {
+    fetch('https://example-store.com/wp-json/wc/store/v1/products')
+      .then(res => res.json())
+      .then(data => setProducts(data));
+  }, []);
+  
+  return (
+    <div className="product-grid">
+      {products.map(product => (
+        <ProductCard key={product.id} product={product} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Cart Token Authentication
+
+For serverless or headless setups, use Cart Tokens instead of cookies:
+
+```javascript
+// Get cart with token
+const response = await fetch('/wp-json/wc/store/v1/cart', {
+  headers: {
+    'Cart-Token': localStorage.getItem('cartToken')
+  }
+});
+
+// Store the updated token
+const newToken = response.headers.get('Cart-Token');
+localStorage.setItem('cartToken', newToken);
+```
+
+## Extensibility
+
+The Store API can be extended by plugin developers:
+
+### Adding Custom Fields
+
+```php
+use Automattic\WooCommerce\StoreApi\Schemas\ExtendSchema;
+use Automattic\WooCommerce\StoreApi\StoreApi;
+
+$extend = StoreApi::container()->get( ExtendSchema::class );
+
+$extend->register_endpoint_data([
+  'endpoint'        => 'cart-item',
+  'namespace'       => 'my-plugin',
+  'data_callback'   => function() {
+    return ['custom_field' => 'custom_value'];
+  },
+  'schema_callback' => function() {
+    return [
+      'custom_field' => [
+        'description' => 'My custom field',
+        'type'        => 'string',
+      ],
+    ];
+  },
+]);
+```
+
+### Custom Routes
+
+For entirely new endpoints, use WordPress's `register_rest_route()`:
+
+```php
+register_rest_route('wc/store/v1', '/custom-endpoint', [
+  'methods'  => 'GET',
+  'callback' => 'my_custom_endpoint_handler',
+  'permission_callback' => '__return_true',
+]);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Cart API" icon="cart-shopping" href="/api/store-api/cart">
+    Learn how to manage cart operations, add items, and apply coupons
+  </Card>
+  
+  <Card title="Checkout API" icon="credit-card" href="/api/store-api/checkout">
+    Understand the checkout flow and payment processing
+  </Card>
+  
+  <Card title="REST API Reference" icon="book" href="https://woocommerce.github.io/woocommerce-rest-api-docs/">
+    Explore the authenticated WooCommerce REST API for admin operations
+  </Card>
+  
+  <Card title="WordPress REST API" icon="wordpress" href="https://developer.wordpress.org/rest-api/">
+    Learn about the underlying WordPress REST API
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [Store API Guiding Principles](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/src/Blocks/Domain/Services/README.md)
+- [Extending the Store API](https://github.com/woocommerce/woocommerce-blocks/blob/trunk/docs/third-party-developers/extensibility/rest-api/extend-rest-api-add-custom-fields.md)
+- [WooCommerce Blocks Documentation](https://developer.woocommerce.com/docs/category/woocommerce-blocks/)
+- [Rate Limiting](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/src/Blocks/StoreApi/docs/rate-limiting.md)

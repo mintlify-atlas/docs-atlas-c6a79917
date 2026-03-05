@@ -1,0 +1,642 @@
+---
+title: Extensible WooCommerce Blocks
+description: Working with extensible WooCommerce blocks using filters, Slot Fills, and customization points
+---
+
+# Extensible WooCommerce Blocks
+
+WooCommerce provides powerful extensibility mechanisms for customizing Cart, Checkout, and Product Collection blocks without modifying core code. This guide covers filters, Slot Fills, inner blocks, and integration points.
+
+## Overview
+
+Extensible blocks support three primary customization approaches:
+
+1. **Filters**: Modify data and rendering output (prices, labels, CSS classes)
+2. **Slot Fills**: Inject custom components into predefined locations
+3. **Inner Blocks**: Add custom nested blocks to extensible parent blocks
+
+## Filter Registry
+
+The Filter Registry allows you to register callbacks that modify block behavior and appearance.
+
+### Registering Filters
+
+Use `registerCheckoutFilters` to register multiple filters at once:
+
+```typescript
+import { registerCheckoutFilters } from '@woocommerce/blocks-checkout';
+
+registerCheckoutFilters('my-extension', {
+  itemName: (defaultValue, extensions, args) => {
+    return `🎁 ${defaultValue}`;
+  },
+  cartItemPrice: (defaultValue, extensions, args) => {
+    return `<price/> (including tax)`;
+  },
+  totalLabel: (defaultValue, extensions, args) => {
+    return 'Grand Total';
+  },
+});
+```
+
+<Info>
+The first parameter (`my-extension`) is your unique namespace. Use your plugin slug to avoid conflicts.
+</Info>
+
+### Available Cart & Checkout Filters
+
+#### Cart Line Items
+
+```typescript
+registerCheckoutFilters('my-extension', {
+  // Modify CSS class for cart items
+  cartItemClass: (defaultValue, extensions, args) => {
+    if (args.cartItem.id === 123) {
+      return 'featured-product';
+    }
+    return defaultValue;
+  },
+
+  // Modify item price display
+  cartItemPrice: (defaultValue, extensions, args) => {
+    return `${defaultValue} per unit`;
+  },
+
+  // Modify product name
+  itemName: (defaultValue, extensions, args) => {
+    const { cartItem } = args;
+    return `${defaultValue} (SKU: ${cartItem.sku})`;
+  },
+
+  // Modify sale badge format
+  saleBadgePriceFormat: (defaultValue, extensions, args) => {
+    return '<price/> SALE!';
+  },
+
+  // Show/hide remove item link
+  showRemoveItemLink: (defaultValue, extensions, args) => {
+    return args.cartItem.quantity > 1;
+  },
+
+  // Modify subtotal format
+  subtotalPriceFormat: (defaultValue, extensions, args) => {
+    return '<price/> total';
+  },
+});
+```
+
+#### Checkout Actions
+
+```typescript
+registerCheckoutFilters('my-extension', {
+  // Modify "Proceed to Checkout" button label
+  proceedToCheckoutButtonLabel: (defaultValue) => {
+    return 'Continue to Payment';
+  },
+
+  // Modify "Proceed to Checkout" button link
+  proceedToCheckoutButtonLink: (defaultValue) => {
+    return '/custom-checkout';
+  },
+
+  // Modify "Place Order" button label
+  placeOrderButtonLabel: (defaultValue) => {
+    return 'Complete Purchase';
+  },
+});
+```
+
+#### Totals and Coupons
+
+```typescript
+registerCheckoutFilters('my-extension', {
+  // Modify total label
+  totalLabel: (defaultValue) => {
+    return 'Amount Due';
+  },
+
+  // Modify total value display
+  totalValue: (defaultValue) => {
+    return `${defaultValue} (tax included)`;
+  },
+
+  // Filter available coupons
+  coupons: (defaultValue, extensions, args) => {
+    return defaultValue.filter((coupon) => {
+      return coupon.code !== 'INTERNAL';
+    });
+  },
+
+  // Show/hide coupon notices
+  showApplyCouponNotice: (defaultValue) => {
+    return false; // Hide success notice
+  },
+  showRemoveCouponNotice: (defaultValue) => {
+    return false; // Hide removal notice
+  },
+});
+```
+
+### Context-Aware Filtering
+
+Filters receive context information to enable conditional logic:
+
+```typescript
+const isOrderSummary = (args) => args?.context === 'summary';
+const isCartPage = (args) => args?.context === 'woocommerce/cart';
+
+registerCheckoutFilters('my-extension', {
+  cartItemClass: (defaultValue, extensions, args) => {
+    if (isOrderSummary(args)) {
+      return 'summary-item';
+    }
+    if (isCartPage(args)) {
+      return 'cart-page-item';
+    }
+    return defaultValue;
+  },
+
+  itemName: (defaultValue, extensions, args) => {
+    // Only modify in order summary
+    if (isOrderSummary(args)) {
+      return `📦 ${defaultValue}`;
+    }
+    return defaultValue;
+  },
+});
+```
+
+<Note>
+The `args` parameter contains `context`, `cartItem`, and `extensions` data. Always check context to ensure filters apply in the right location.
+</Note>
+
+## Slot Fills
+
+Slot Fills allow you to inject custom React components into predefined locations in Cart and Checkout blocks.
+
+### Using Slot Fills
+
+```typescript
+import { registerPlugin } from '@wordpress/plugins';
+import { ExperimentalOrderMeta } from '@woocommerce/blocks-checkout';
+import { __ } from '@wordpress/i18n';
+
+const MyCustomContent = () => {
+  return (
+    <ExperimentalOrderMeta>
+      <div className="my-custom-section">
+        {__('Custom content in order summary', 'my-plugin')}
+      </div>
+    </ExperimentalOrderMeta>
+  );
+};
+
+registerPlugin('my-plugin-slot-fills', {
+  render: MyCustomContent,
+  scope: 'woocommerce-checkout',
+});
+```
+
+### Available Slots
+
+#### ExperimentalOrderMeta
+
+Renders below the order summary, above "Proceed to Checkout":
+
+```typescript
+import { ExperimentalOrderMeta } from '@woocommerce/blocks-checkout';
+
+const SubscriptionInfo = ({ cart, extensions }) => {
+  return (
+    <ExperimentalOrderMeta>
+      <div className="subscription-details">
+        <p>Recurring Total: {cart.totals.recurring_total}</p>
+      </div>
+    </ExperimentalOrderMeta>
+  );
+};
+```
+
+**Passed Props:**
+- `cart`: Cart data in camelCase
+- `extensions`: Custom data from ExtendSchema
+- `context`: Block name (`woocommerce/cart` or `woocommerce/checkout`)
+
+#### ExperimentalOrderShippingPackages
+
+Renders inside shipping options:
+
+```typescript
+import { ExperimentalOrderShippingPackages } from '@woocommerce/blocks-checkout';
+
+const ShippingMessage = () => {
+  return (
+    <ExperimentalOrderShippingPackages>
+      <div className="shipping-notice">
+        <p>📦 Free shipping on orders over $50</p>
+      </div>
+    </ExperimentalOrderShippingPackages>
+  );
+};
+```
+
+**Passed Props:**
+- `collapsible`: Whether panels are collapsible
+- `collapse`: Whether panels start collapsed
+- `showItems`: Whether to show package contents
+- `noResultsMessage`: React element for no results
+- `renderOption`: Function to render shipping rates
+- `cart`, `extensions`, `context`, `components`
+
+#### ExperimentalOrderLocalPickupPackages
+
+Renders in Checkout Pickup Options (Checkout only):
+
+```typescript
+import { ExperimentalOrderLocalPickupPackages } from '@woocommerce/blocks-checkout';
+
+const PickupInstructions = () => {
+  return (
+    <ExperimentalOrderLocalPickupPackages>
+      <div className="pickup-instructions">
+        <p>Store hours: Monday-Friday 9AM-5PM</p>
+      </div>
+    </ExperimentalOrderLocalPickupPackages>
+  );
+};
+```
+
+**Passed Props:**
+- `renderPickupLocation`: Function to render pickup address
+- `cart`, `extensions`, `components`
+
+#### ExperimentalDiscountsMeta
+
+Renders below the coupon code input:
+
+```typescript
+import { ExperimentalDiscountsMeta } from '@woocommerce/blocks-checkout';
+
+const LoyaltyPoints = ({ cart, extensions }) => {
+  const points = extensions?.myPlugin?.loyaltyPoints || 0;
+  
+  return (
+    <ExperimentalDiscountsMeta>
+      <div className="loyalty-points">
+        <p>Available Points: {points}</p>
+      </div>
+    </ExperimentalDiscountsMeta>
+  );
+};
+```
+
+**Passed Props:**
+- `cart`, `extensions`, `context`
+
+<Warning>
+Slots prefixed with `Experimental` are subject to change. They may be renamed or removed in future versions. Monitor WooCommerce release notes when upgrading.
+</Warning>
+
+## Inner Blocks
+
+Add custom blocks as children of Cart and Checkout blocks.
+
+### Creating an Inner Block
+
+```typescript
+// block.json
+{
+  "apiVersion": 3,
+  "name": "my-plugin/newsletter-subscription",
+  "title": "Newsletter Subscription",
+  "category": "woocommerce",
+  "parent": ["woocommerce/checkout-contact-information-block"],
+  "attributes": {
+    "lock": {
+      "type": "object",
+      "default": {
+        "remove": true,
+        "move": true
+      }
+    }
+  }
+}
+```
+
+```typescript
+// edit.tsx
+import { useBlockProps, RichText } from '@wordpress/block-editor';
+import { CheckboxControl } from '@woocommerce/blocks-checkout';
+import { __ } from '@wordpress/i18n';
+
+export const Edit = ({ attributes, setAttributes }) => {
+  const { text } = attributes;
+  const blockProps = useBlockProps();
+
+  return (
+    <div {...blockProps}>
+      <CheckboxControl id="newsletter" checked={false} disabled />
+      <RichText
+        value={text}
+        onChange={(value) => setAttributes({ text: value })}
+        placeholder={__('Subscribe to our newsletter', 'my-plugin')}
+      />
+    </div>
+  );
+};
+```
+
+### Registering Inner Blocks
+
+Register your inner block type with the filter:
+
+```typescript
+import { registerCheckoutFilters } from '@woocommerce/blocks-checkout';
+
+registerCheckoutFilters('my-plugin', {
+  additionalCartCheckoutInnerBlockTypes: (defaultValue) => {
+    return [...defaultValue, 'my-plugin/newsletter-subscription'];
+  },
+});
+```
+
+## Product Collection Extensibility
+
+Product Collection blocks support custom collections and filters.
+
+### Registering Custom Collections
+
+```typescript
+import { __experimentalRegisterProductCollection } from '@woocommerce/blocks-registry';
+
+__experimentalRegisterProductCollection({
+  name: 'my-plugin/featured-products',
+  title: 'Featured Products',
+  icon: 'star-filled',
+  description: 'Display your featured products',
+  keywords: ['featured', 'products', 'showcase'],
+  attributes: {
+    query: {
+      perPage: 8,
+      featured: true,
+    },
+    displayLayout: {
+      type: 'grid',
+      columns: 4,
+      shrinkColumns: true,
+    },
+    hideControls: ['featured', 'on-sale'],
+  },
+});
+```
+
+### Custom Collection with Query
+
+```typescript
+__experimentalRegisterProductCollection({
+  name: 'my-plugin/sale-products',
+  title: 'Products on Sale',
+  icon: 'tag',
+  description: 'Display products currently on sale',
+  attributes: {
+    query: {
+      perPage: 12,
+      woocommerceOnSale: true,
+      orderBy: 'price',
+      order: 'asc',
+    },
+  },
+});
+```
+
+### Custom Inner Blocks
+
+```typescript
+__experimentalRegisterProductCollection({
+  name: 'my-plugin/custom-layout',
+  title: 'Custom Product Layout',
+  icon: 'layout',
+  innerBlocks: [
+    [
+      'core/heading',
+      {
+        textAlign: 'center',
+        level: 2,
+        content: 'Our Products',
+      },
+    ],
+    [
+      'woocommerce/product-template',
+      {},
+      [
+        ['woocommerce/product-image'],
+        ['woocommerce/product-title'],
+        ['woocommerce/product-price', { fontSize: 'large' }],
+        ['woocommerce/product-button'],
+      ],
+    ],
+  ],
+});
+```
+
+### Preview State Management
+
+```typescript
+__experimentalRegisterProductCollection({
+  name: 'my-plugin/related-products',
+  title: 'Related Products',
+  usesReference: ['product'], // Requires product context
+  preview: {
+    initialPreviewState: {
+      isPreview: true,
+      previewMessage: 'This will show products related to the current product.',
+    },
+    setPreviewState: ({ setState, attributes, location }) => {
+      // Check if we have product context
+      if (location?.product) {
+        setState({ isPreview: false, previewMessage: '' });
+      }
+    },
+  },
+});
+```
+
+## DOM Events
+
+WooCommerce blocks emit custom DOM events for inter-block communication.
+
+### Cart & Checkout Events
+
+```typescript
+// Listen for checkout validation
+document.addEventListener('wc-checkout-validation', (event) => {
+  console.log('Checkout validation triggered');
+});
+
+// Listen for cart updates
+document.addEventListener('wc-blocks_added_to_cart', (event) => {
+  console.log('Product added to cart:', event.detail);
+});
+
+// Listen for checkout errors
+document.addEventListener('wc-blocks_checkout_error', (event) => {
+  console.log('Checkout error:', event.detail);
+});
+```
+
+### Product Collection Events
+
+```typescript
+// Product collection filter applied
+document.addEventListener(
+  'woocommerce/product-collection/filter-applied',
+  (event) => {
+    console.log('Filter applied:', event.detail);
+  }
+);
+```
+
+## Integration Interface
+
+Use `IntegrationInterface` to properly register scripts and data:
+
+```php
+<?php
+use Automattic\WooCommerce\Blocks\Integrations\IntegrationInterface;
+
+class My_Extension_Integration implements IntegrationInterface {
+  public function get_name() {
+    return 'my-extension';
+  }
+
+  public function initialize() {
+    $this->register_main_integration();
+  }
+
+  public function get_script_handles() {
+    return ['my-extension-blocks'];
+  }
+
+  public function get_editor_script_handles() {
+    return ['my-extension-blocks-editor'];
+  }
+
+  public function get_script_data() {
+    return [
+      'myCustomData' => [
+        'apiKey' => get_option('my_api_key'),
+        'enabled' => true,
+      ],
+    ];
+  }
+
+  private function register_main_integration() {
+    $script_path = '/build/index.js';
+    $script_asset_path = dirname(__FILE__) . '/build/index.asset.php';
+    $script_asset = require $script_asset_path;
+
+    wp_register_script(
+      'my-extension-blocks',
+      plugins_url($script_path, __FILE__),
+      $script_asset['dependencies'],
+      $script_asset['version'],
+      true
+    );
+  }
+}
+```
+
+Register the integration:
+
+```php
+add_action(
+  'woocommerce_blocks_loaded',
+  function() {
+    require_once __DIR__ . '/includes/class-my-extension-integration.php';
+    add_action(
+      'woocommerce_blocks_cart_block_registration',
+      function($integration_registry) {
+        $integration_registry->register(new My_Extension_Integration());
+      }
+    );
+  }
+);
+```
+
+## Troubleshooting
+
+### Filter Not Working
+
+If logged in as administrator, you'll see error messages in the UI and console:
+
+```typescript
+// Ensure filter returns correct type
+registerCheckoutFilters('my-plugin', {
+  itemName: (defaultValue, extensions, args) => {
+    // ❌ Wrong: returns undefined
+    if (args.cartItem.id === 123) {
+      return 'Special Item';
+    }
+    // Missing return statement!
+  },
+});
+
+// ✅ Correct: always returns string
+registerCheckoutFilters('my-plugin', {
+  itemName: (defaultValue, extensions, args) => {
+    if (args.cartItem.id === 123) {
+      return 'Special Item';
+    }
+    return defaultValue; // Always return a value
+  },
+});
+```
+
+### Slot Fill Not Rendering
+
+Ensure correct scope:
+
+```typescript
+registerPlugin('my-plugin-fills', {
+  render: MyComponent,
+  scope: 'woocommerce-checkout', // Required!
+});
+```
+
+### Script Not Loading
+
+Verify asset file is generated:
+
+```bash
+ls -la build/
+# Should contain: index.js and index.asset.php
+```
+
+Check dependencies are enqueued:
+
+```php
+$script_asset = require $script_asset_path;
+wp_register_script(
+  'my-script',
+  $script_url,
+  $script_asset['dependencies'], // Critical!
+  $script_asset['version']
+);
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Tutorials" icon="graduation-cap" href="/blocks/tutorials">
+    Build complete examples step-by-step
+  </Card>
+  <Card title="Store API Extension" icon="plug" href="/apis/store-api/extending-store-api">
+    Add custom data to cart and checkout endpoints
+  </Card>
+  <Card title="Additional Checkout Fields" icon="input-text" href="/blocks/tutorials#additional-checkout-fields">
+    Add custom fields to checkout forms
+  </Card>
+  <Card title="Payment Method Integration" icon="credit-card" href="/blocks/payment-methods">
+    Create custom payment method blocks
+  </Card>
+</CardGroup>

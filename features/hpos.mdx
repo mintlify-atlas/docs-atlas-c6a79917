@@ -1,0 +1,498 @@
+---
+title: "High-Performance Order Storage (HPOS)"
+description: "Understanding and working with WooCommerce's High-Performance Order Storage system."
+---
+
+## What is HPOS?
+
+High-Performance Order Storage (HPOS), also known as **Custom Order Tables**, is a modern database architecture for storing WooCommerce orders. Instead of using WordPress posts, HPOS uses dedicated database tables optimized for e-commerce operations.
+
+<Info>
+HPOS is the future of order storage in WooCommerce and is enabled by default in WooCommerce 8.2+.
+</Info>
+
+## Why HPOS?
+
+### Problems with Post-Based Storage
+
+Traditionally, WooCommerce stored orders as WordPress custom post types (`shop_order`). This approach had limitations:
+
+- **Performance**: Post meta queries are slow at scale
+- **Database bloat**: Excessive meta table growth
+- **Complexity**: Order data scattered across multiple tables
+- **Maintenance**: WordPress table optimization affects orders
+
+### HPOS Benefits
+
+<CardGroup cols={2}>
+  <Card title="Better Performance" icon="gauge-high">
+    Optimized queries and indexes for faster order retrieval and updates.
+  </Card>
+  <Card title="Scalability" icon="chart-line">
+    Handle millions of orders without performance degradation.
+  </Card>
+  <Card title="Data Integrity" icon="shield-check">
+    Proper foreign keys and constraints ensure data consistency.
+  </Card>
+  <Card title="Simpler Queries" icon="database">
+    Direct SQL queries without post meta complexity.
+  </Card>
+</CardGroup>
+
+## Database Tables
+
+HPOS introduces four new database tables:
+
+### Core Tables
+
+```sql
+-- Main orders table
+wp_wc_orders
+- id
+- status
+- type
+- currency
+- total_amount
+- customer_id
+- billing_address_id
+- shipping_address_id
+- date_created_gmt
+- date_updated_gmt
+
+-- Order addresses
+wp_wc_order_addresses
+- id
+- order_id
+- address_type (billing/shipping)
+- first_name
+- last_name
+- company
+- address_1
+- address_2
+- city
+- state
+- postcode
+- country
+- email
+- phone
+
+-- Order operational data (meta)
+wp_wc_order_operational_data
+- id
+- order_id
+- created_via
+- woocommerce_version
+- prices_include_tax
+- coupon_usages_are_counted
+
+-- Additional meta data
+wp_wc_orders_meta
+- id
+- order_id
+- meta_key
+- meta_value
+```
+
+## Compatibility Modes
+
+HPOS supports three compatibility modes:
+
+<Steps>
+  <Step title="Posts Storage (Legacy)">
+    Orders are stored as WordPress posts. Default for WooCommerce < 8.2.
+    
+    ```php
+    // Orders stored in:
+    // wp_posts (post_type = 'shop_order')
+    // wp_postmeta (order meta)
+    ```
+  </Step>
+  
+  <Step title="Compatibility Mode">
+    Orders are stored in both posts and custom tables. Useful during migration.
+    
+    ```php
+    // Data synchronized between:
+    // - wp_posts + wp_postmeta (legacy)
+    // - wp_wc_orders + wp_wc_order_* (HPOS)
+    ```
+    
+    <Warning>
+    Compatibility mode has a performance overhead due to dual writes.
+    </Warning>
+  </Step>
+  
+  <Step title="HPOS (Recommended)">
+    Orders are stored only in custom tables. Best performance.
+    
+    ```php
+    // Orders stored in:
+    // wp_wc_orders
+    // wp_wc_order_addresses
+    // wp_wc_order_operational_data
+    // wp_wc_orders_meta
+    ```
+  </Step>
+</Steps>
+
+## Enabling HPOS
+
+### Admin Interface
+
+<Steps>
+  <Step title="Navigate to Settings">
+    Go to **WooCommerce > Settings > Advanced > Features**
+  </Step>
+  
+  <Step title="Enable High-Performance Order Storage">
+    Check the box for "Enable High-Performance Order Storage"
+  </Step>
+  
+  <Step title="Run Migration">
+    Click "Update" to save settings. WooCommerce will begin migrating orders.
+  </Step>
+</Steps>
+
+### Programmatic Control
+
+```php
+// Check if HPOS is enabled
+if ( wc_get_container()->get( Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class )->custom_orders_table_usage_is_enabled() ) {
+    // HPOS is active
+}
+
+// Check if compatibility mode is enabled
+if ( wc_get_container()->get( Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController::class )->data_sync_is_enabled() ) {
+    // Compatibility mode is active
+}
+```
+
+## Developer Guide
+
+### Working with Orders
+
+The WooCommerce order API remains the same regardless of storage method:
+
+```php
+// Create order - works with both storage methods
+$order = wc_create_order();
+
+// Get order - works with both storage methods
+$order = wc_get_order( $order_id );
+
+// Update order
+$order->set_status( 'processing' );
+$order->save();
+
+// Get order meta
+$value = $order->get_meta( 'custom_field' );
+
+// Set order meta
+$order->update_meta_data( 'custom_field', 'value' );
+$order->save();
+```
+
+<Note>
+Using the WooCommerce CRUD methods ensures compatibility with both storage systems.
+</Note>
+
+### Direct Database Queries
+
+If you must query the database directly, use the `OrdersTableDataStore` class:
+
+```php
+use Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore;
+
+// Check which storage is active
+$orders_table = wc_get_container()->get( OrdersTableDataStore::class );
+
+if ( $orders_table::get_orders_table_name() ) {
+    global $wpdb;
+    
+    // HPOS query
+    $orders = $wpdb->get_results(
+        "SELECT * FROM {$wpdb->prefix}wc_orders 
+         WHERE status = 'wc-processing' 
+         ORDER BY date_created_gmt DESC
+         LIMIT 10"
+    );
+} else {
+    // Legacy post query
+    $orders = get_posts( array(
+        'post_type'   => 'shop_order',
+        'post_status' => 'wc-processing',
+        'numberposts' => 10,
+    ) );
+}
+```
+
+<Warning>
+Direct database queries bypass WooCommerce's data layer and may break with future updates. Use WooCommerce CRUD methods whenever possible.
+</Warning>
+
+### Handling Custom Order Meta
+
+Custom meta data works the same way:
+
+```php
+// Add custom meta
+$order->add_meta_data( 'delivery_date', '2024-03-15', true );
+$order->save();
+
+// Get custom meta
+$delivery_date = $order->get_meta( 'delivery_date' );
+
+// Update custom meta
+$order->update_meta_data( 'delivery_date', '2024-03-20' );
+$order->save();
+
+// Delete custom meta
+$order->delete_meta_data( 'delivery_date' );
+$order->save();
+```
+
+## Extension Compatibility
+
+### Testing Your Extension
+
+<Steps>
+  <Step title="Enable HPOS">
+    Test your extension with HPOS enabled.
+  </Step>
+  
+  <Step title="Enable Compatibility Mode">
+    Test with both storage methods synchronized.
+  </Step>
+  
+  <Step title="Test Data Migration">
+    Migrate orders back and forth between storage methods.
+  </Step>
+  
+  <Step title="Test Direct Queries">
+    If using direct SQL, ensure queries work with both storage types.
+  </Step>
+</Steps>
+
+### Common Compatibility Issues
+
+<Accordion title="Issue: Direct wp_posts queries">
+  **Problem**: Code queries `wp_posts` directly for `shop_order` post type.
+  
+  **Solution**: Use WooCommerce CRUD methods:
+  
+  ```php
+  // ❌ Don't do this
+  $orders = $wpdb->get_results(
+      "SELECT * FROM {$wpdb->posts} WHERE post_type = 'shop_order'"
+  );
+  
+  // ✅ Do this instead
+  $orders = wc_get_orders( array(
+      'limit' => -1,
+  ) );
+  ```
+</Accordion>
+
+<Accordion title="Issue: Using get_post_meta() for orders">
+  **Problem**: Using WordPress post meta functions directly.
+  
+  **Solution**: Use order methods:
+  
+  ```php
+  // ❌ Don't do this
+  $meta = get_post_meta( $order_id, '_custom_field', true );
+  
+  // ✅ Do this instead
+  $order = wc_get_order( $order_id );
+  $meta = $order->get_meta( '_custom_field' );
+  ```
+</Accordion>
+
+<Accordion title="Issue: WordPress query functions">
+  **Problem**: Using `WP_Query`, `get_posts()`, or similar for orders.
+  
+  **Solution**: Use `wc_get_orders()`:
+  
+  ```php
+  // ❌ Don't do this
+  $query = new WP_Query( array(
+      'post_type'   => 'shop_order',
+      'post_status' => 'wc-processing',
+  ) );
+  
+  // ✅ Do this instead
+  $orders = wc_get_orders( array(
+      'status' => 'processing',
+  ) );
+  ```
+</Accordion>
+
+### Declaring HPOS Compatibility
+
+Declare that your extension is compatible with HPOS:
+
+```php
+add_action( 'before_woocommerce_init', function() {
+    if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
+        \Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility(
+            'custom_order_tables',
+            __FILE__,
+            true  // true = compatible, false = incompatible
+        );
+    }
+} );
+```
+
+<Info>
+Add this code early in your plugin's main file, ideally in the plugin header area.
+</Info>
+
+## Migration Process
+
+WooCommerce provides tools to migrate orders between storage methods:
+
+### Automated Migration
+
+When HPOS is first enabled:
+
+1. Orders are migrated in batches (background process)
+2. Site remains functional during migration
+3. Progress shown in admin dashboard
+4. Failed orders are logged for manual review
+
+### Manual Migration Commands
+
+```bash
+# Migrate orders to HPOS
+wp wc cot migrate --batch-size=1000
+
+# Verify migration status
+wp wc cot verify_cot_data
+
+# Synchronize data (if in compatibility mode)
+wp wc cot sync --batch-size=500
+```
+
+## Performance Considerations
+
+### Query Optimization
+
+HPOS tables are optimized with indexes:
+
+```sql
+-- Indexed columns in wp_wc_orders
+INDEX (status)
+INDEX (customer_id)
+INDEX (date_created_gmt)
+INDEX (type)
+```
+
+Use these indexed columns in queries for best performance:
+
+```php
+// Optimized: uses status index
+$orders = wc_get_orders( array(
+    'status' => 'processing',
+    'limit'  => 100,
+) );
+
+// Optimized: uses customer_id index
+$orders = wc_get_orders( array(
+    'customer_id' => $customer_id,
+    'limit'       => 50,
+) );
+```
+
+### Caching
+
+Order objects are cached automatically:
+
+```php
+// First call queries database
+$order = wc_get_order( 123 );
+
+// Subsequent calls use cache
+$order = wc_get_order( 123 );  // From cache
+
+// Clear order cache
+wp_cache_delete( 'order-123', 'orders' );
+```
+
+## Troubleshooting
+
+### Migration Issues
+
+<Accordion title="Migration stuck or slow">
+  Check the migration status:
+  
+  ```bash
+  wp wc cot status
+  ```
+  
+  Resume migration:
+  
+  ```bash
+  wp wc cot migrate --resume
+  ```
+</Accordion>
+
+<Accordion title="Data inconsistencies">
+  Enable compatibility mode and run synchronization:
+  
+  ```bash
+  wp wc cot sync --batch-size=100
+  ```
+</Accordion>
+
+### Debug Mode
+
+Enable debug logging:
+
+```php
+define( 'WC_LOG_THRESHOLD', 'debug' );
+
+// Logs written to:
+// wp-content/uploads/wc-logs/
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use WooCommerce CRUD" icon="check">
+    Always use `wc_get_order()` and order methods instead of direct database access.
+  </Card>
+  <Card title="Test Both Modes" icon="vial">
+    Test your extensions with both post-based and HPOS storage enabled.
+  </Card>
+  <Card title="Declare Compatibility" icon="certificate">
+    Use `FeaturesUtil::declare_compatibility()` to declare HPOS support.
+  </Card>
+  <Card title="Monitor Performance" icon="chart-line">
+    Check query performance after enabling HPOS to verify improvements.
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [Official HPOS Documentation](https://github.com/woocommerce/woocommerce/wiki/High-Performance-Order-Storage)
+- [HPOS Developer Guide](https://developer.woocommerce.com/docs/high-performance-order-storage/)
+- [Migration Guide](https://woocommerce.com/document/high-performance-order-storage/)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="REST API Orders"
+    icon="code"
+    href="/api/rest-api/orders"
+  >
+    Work with orders via REST API
+  </Card>
+  <Card
+    title="Extension Best Practices"
+    icon="star"
+    href="/extensions/best-practices"
+  >
+    Learn extension development best practices
+  </Card>
+</CardGroup>

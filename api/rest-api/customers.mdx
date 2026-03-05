@@ -1,0 +1,725 @@
+---
+title: Customers REST API
+description: Manage customers through the WooCommerce REST API - list, create, update, and delete customers
+---
+
+# Customers API
+
+The Customers endpoint allows you to create, read, update, and delete customers in your WooCommerce store.
+
+## The Customer Object
+
+### Customer Properties
+
+<ResponseField name="id" type="integer" required>
+  Unique identifier for the customer. Read-only.
+</ResponseField>
+
+<ResponseField name="date_created" type="string">
+  The date the customer was created, in ISO8601 format. Read-only.
+</ResponseField>
+
+<ResponseField name="date_modified" type="string">
+  The date the customer was last modified, in ISO8601 format. Read-only.
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  The email address for the customer.
+</ResponseField>
+
+<ResponseField name="first_name" type="string">
+  Customer first name.
+</ResponseField>
+
+<ResponseField name="last_name" type="string">
+  Customer last name.
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  Customer role. Read-only.
+</ResponseField>
+
+<ResponseField name="username" type="string">
+  Customer login name. Cannot be changed after creation.
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  Customer password. Write-only (never returned in responses).
+</ResponseField>
+
+<ResponseField name="billing" type="object">
+  Billing address.
+  ```json
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "company": "Acme Inc",
+    "address_1": "123 Main St",
+    "address_2": "Apt 4",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10001",
+    "country": "US",
+    "email": "john@example.com",
+    "phone": "555-1234"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="shipping" type="object">
+  Shipping address.
+  ```json
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "company": "Acme Inc",
+    "address_1": "123 Main St",
+    "address_2": "Apt 4",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10001",
+    "country": "US"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="is_paying_customer" type="boolean">
+  Whether the customer has made a purchase. Read-only.
+</ResponseField>
+
+<ResponseField name="avatar_url" type="string">
+  Avatar URL. Read-only.
+</ResponseField>
+
+## List All Customers
+
+Retrieve a list of all customers in your store.
+
+<CodeGroup>
+```bash cURL
+curl https://example.com/wp-json/wc/v3/customers \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+const response = await api.get('/customers');
+console.log(response.data);
+```
+
+```python Python
+response = requests.get(
+    'https://example.com/wp-json/wc/v3/customers',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+customers = response.json()
+```
+
+```php PHP
+$customers = $woocommerce->get('customers');
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="1">
+  Current page of the collection.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="10">
+  Maximum number of items to return (max 100).
+</ParamField>
+
+<ParamField query="search" type="string">
+  Limit results to those matching a string (searches username, email, first name, last name).
+</ParamField>
+
+<ParamField query="email" type="string">
+  Limit result set to customers with a specific email.
+</ParamField>
+
+<ParamField query="role" type="string" default="all">
+  Limit result set to customers with specific role. Options: `all`, `administrator`, `editor`, `author`, `contributor`, `subscriber`, `customer`, `shop_manager`
+</ParamField>
+
+<ParamField query="orderby" type="string" default="name">
+  Sort customers by attribute. Options: `id`, `include`, `name`, `registered_date`
+</ParamField>
+
+<ParamField query="order" type="string" default="asc">
+  Order sort direction. Options: `asc`, `desc`
+</ParamField>
+
+### Example Response
+
+```json
+[
+  {
+    "id": 789,
+    "date_created": "2024-01-10T12:00:00",
+    "date_created_gmt": "2024-01-10T17:00:00",
+    "date_modified": "2024-02-15T09:30:00",
+    "date_modified_gmt": "2024-02-15T14:30:00",
+    "email": "john.doe@example.com",
+    "first_name": "John",
+    "last_name": "Doe",
+    "role": "customer",
+    "username": "johndoe",
+    "billing": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "company": "Acme Inc",
+      "address_1": "123 Main Street",
+      "address_2": "Suite 100",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10001",
+      "country": "US",
+      "email": "john.doe@example.com",
+      "phone": "(555) 123-4567"
+    },
+    "shipping": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "company": "Acme Inc",
+      "address_1": "123 Main Street",
+      "address_2": "Suite 100",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10001",
+      "country": "US"
+    },
+    "is_paying_customer": true,
+    "avatar_url": "https://secure.gravatar.com/avatar/...",
+    "meta_data": []
+  }
+]
+```
+
+## Retrieve a Customer
+
+Get details of a single customer by ID.
+
+<CodeGroup>
+```bash cURL
+curl https://example.com/wp-json/wc/v3/customers/789 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+const response = await api.get('/customers/789');
+console.log(response.data);
+```
+
+```python Python
+response = requests.get(
+    'https://example.com/wp-json/wc/v3/customers/789',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+customer = response.json()
+```
+
+```php PHP
+$customer = $woocommerce->get('customers/789');
+```
+</CodeGroup>
+
+## Create a Customer
+
+Create a new customer in your store.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://example.com/wp-json/wc/v3/customers \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane.smith@example.com",
+    "first_name": "Jane",
+    "last_name": "Smith",
+    "username": "janesmith",
+    "password": "SecurePassword123!",
+    "billing": {
+      "first_name": "Jane",
+      "last_name": "Smith",
+      "company": "",
+      "address_1": "456 Oak Avenue",
+      "address_2": "",
+      "city": "Los Angeles",
+      "state": "CA",
+      "postcode": "90001",
+      "country": "US",
+      "email": "jane.smith@example.com",
+      "phone": "(555) 987-6543"
+    },
+    "shipping": {
+      "first_name": "Jane",
+      "last_name": "Smith",
+      "company": "",
+      "address_1": "456 Oak Avenue",
+      "address_2": "",
+      "city": "Los Angeles",
+      "state": "CA",
+      "postcode": "90001",
+      "country": "US"
+    }
+  }'
+```
+
+```javascript JavaScript
+const newCustomer = {
+  email: 'jane.smith@example.com',
+  first_name: 'Jane',
+  last_name: 'Smith',
+  username: 'janesmith',
+  password: 'SecurePassword123!',
+  billing: {
+    first_name: 'Jane',
+    last_name: 'Smith',
+    address_1: '456 Oak Avenue',
+    city: 'Los Angeles',
+    state: 'CA',
+    postcode: '90001',
+    country: 'US',
+    email: 'jane.smith@example.com',
+    phone: '(555) 987-6543'
+  },
+  shipping: {
+    first_name: 'Jane',
+    last_name: 'Smith',
+    address_1: '456 Oak Avenue',
+    city: 'Los Angeles',
+    state: 'CA',
+    postcode: '90001',
+    country: 'US'
+  }
+};
+
+const response = await api.post('/customers', newCustomer);
+console.log(response.data);
+```
+
+```python Python
+data = {
+    'email': 'jane.smith@example.com',
+    'first_name': 'Jane',
+    'last_name': 'Smith',
+    'username': 'janesmith',
+    'password': 'SecurePassword123!',
+    'billing': {
+        'first_name': 'Jane',
+        'last_name': 'Smith',
+        'address_1': '456 Oak Avenue',
+        'city': 'Los Angeles',
+        'state': 'CA',
+        'postcode': '90001',
+        'country': 'US',
+        'email': 'jane.smith@example.com',
+        'phone': '(555) 987-6543'
+    },
+    'shipping': {
+        'first_name': 'Jane',
+        'last_name': 'Smith',
+        'address_1': '456 Oak Avenue',
+        'city': 'Los Angeles',
+        'state': 'CA',
+        'postcode': '90001',
+        'country': 'US'
+    }
+}
+
+response = requests.post(
+    'https://example.com/wp-json/wc/v3/customers',
+    json=data,
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+customer = response.json()
+```
+
+```php PHP
+$data = [
+    'email' => 'jane.smith@example.com',
+    'first_name' => 'Jane',
+    'last_name' => 'Smith',
+    'username' => 'janesmith',
+    'password' => 'SecurePassword123!',
+    'billing' => [
+        'first_name' => 'Jane',
+        'last_name' => 'Smith',
+        'address_1' => '456 Oak Avenue',
+        'city' => 'Los Angeles',
+        'state' => 'CA',
+        'postcode' => '90001',
+        'country' => 'US',
+        'email' => 'jane.smith@example.com',
+        'phone' => '(555) 987-6543'
+    ],
+    'shipping' => [
+        'first_name' => 'Jane',
+        'last_name' => 'Smith',
+        'address_1' => '456 Oak Avenue',
+        'city' => 'Los Angeles',
+        'state' => 'CA',
+        'postcode' => '90001',
+        'country' => 'US'
+    ]
+];
+
+$customer = $woocommerce->post('customers', $data);
+```
+</CodeGroup>
+
+### Required Fields
+
+<ParamField body="email" type="string" required>
+  Customer email address (must be unique)
+</ParamField>
+
+### Important Fields
+
+<ParamField body="username" type="string">
+  Customer login name. Auto-generated from email if not provided. Cannot be changed after creation.
+</ParamField>
+
+<ParamField body="password" type="string">
+  Customer password. Auto-generated if not provided.
+</ParamField>
+
+<ParamField body="first_name" type="string">
+  Customer first name
+</ParamField>
+
+<ParamField body="last_name" type="string">
+  Customer last name
+</ParamField>
+
+<ParamField body="billing" type="object">
+  Billing address object (see Customer Object above)
+</ParamField>
+
+<ParamField body="shipping" type="object">
+  Shipping address object (see Customer Object above)
+</ParamField>
+
+## Update a Customer
+
+Update an existing customer.
+
+<CodeGroup>
+```bash cURL
+curl -X PUT https://example.com/wp-json/wc/v3/customers/789 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "first_name": "Jane",
+    "last_name": "Doe",
+    "billing": {
+      "phone": "(555) 111-2222"
+    }
+  }'
+```
+
+```javascript JavaScript
+const updates = {
+  first_name: 'Jane',
+  last_name: 'Doe',
+  billing: {
+    phone: '(555) 111-2222'
+  }
+};
+
+const response = await api.put('/customers/789', updates);
+console.log(response.data);
+```
+
+```python Python
+data = {
+    'first_name': 'Jane',
+    'last_name': 'Doe',
+    'billing': {
+        'phone': '(555) 111-2222'
+    }
+}
+
+response = requests.put(
+    'https://example.com/wp-json/wc/v3/customers/789',
+    json=data,
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+customer = response.json()
+```
+
+```php PHP
+$data = [
+    'first_name' => 'Jane',
+    'last_name' => 'Doe',
+    'billing' => [
+        'phone' => '(555) 111-2222'
+    ]
+];
+
+$customer = $woocommerce->put('customers/789', $data);
+```
+</CodeGroup>
+
+<Note>
+The `username` field cannot be updated after a customer is created.
+</Note>
+
+## Delete a Customer
+
+Delete a customer permanently.
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE https://example.com/wp-json/wc/v3/customers/789?force=true \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+await api.delete('/customers/789', { params: { force: true } });
+```
+
+```python Python
+requests.delete(
+    'https://example.com/wp-json/wc/v3/customers/789',
+    params={'force': True},
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+```
+
+```php PHP
+$woocommerce->delete('customers/789', ['force' => true]);
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField query="force" type="boolean" default="false">
+  Required to be `true` as customers do not support trashing.
+</ParamField>
+
+<ParamField query="reassign" type="integer">
+  User ID to reassign posts to. Required when deleting a customer with posts.
+</ParamField>
+
+<Warning>
+Deleting a customer is permanent and cannot be undone. Consider deactivating the user account instead if you need to preserve data.
+</Warning>
+
+## Batch Update Customers
+
+Create, update, and delete multiple customers in a single request.
+
+```bash
+curl -X POST https://example.com/wp-json/wc/v3/customers/batch \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "create": [
+      {
+        "email": "customer1@example.com",
+        "first_name": "Customer",
+        "last_name": "One",
+        "username": "customer1",
+        "password": "Password123!"
+      }
+    ],
+    "update": [
+      {
+        "id": 789,
+        "billing": {
+          "phone": "(555) 999-8888"
+        }
+      }
+    ],
+    "delete": [
+      456
+    ]
+  }'
+```
+
+## Common Use Cases
+
+### Find Customer by Email
+
+```bash
+curl "https://example.com/wp-json/wc/v3/customers?email=john.doe@example.com" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Search Customers
+
+```bash
+curl "https://example.com/wp-json/wc/v3/customers?search=john" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Update Customer Address
+
+```javascript
+await api.put('/customers/789', {
+  shipping: {
+    first_name: 'John',
+    last_name: 'Doe',
+    address_1: '789 New Street',
+    city: 'Boston',
+    state: 'MA',
+    postcode: '02101',
+    country: 'US'
+  }
+});
+```
+
+### Get Customer Orders
+
+To retrieve a customer's orders, use the Orders endpoint with the customer parameter:
+
+```bash
+curl "https://example.com/wp-json/wc/v3/orders?customer=789" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Reset Customer Password
+
+```javascript
+await api.put('/customers/789', {
+  password: 'NewSecurePassword123!'
+});
+```
+
+## Customer Downloads
+
+Manage downloadable product permissions for customers.
+
+### List Customer Downloads
+
+```bash
+curl https://example.com/wp-json/wc/v3/customers/789/downloads \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+**Response:**
+
+```json
+[
+  {
+    "download_id": "abc123",
+    "download_url": "https://example.com/?download_file=123&...",
+    "product_id": 456,
+    "product_name": "Digital Product",
+    "download_name": "product-file.pdf",
+    "order_id": 789,
+    "order_key": "wc_order_xyz",
+    "downloads_remaining": "unlimited",
+    "access_expires": "never",
+    "access_expires_gmt": "never",
+    "file": {
+      "name": "Product File",
+      "file": "https://example.com/wp-content/uploads/product-file.pdf"
+    }
+  }
+]
+```
+
+## Error Handling
+
+### Invalid Customer ID
+
+```json
+{
+  "code": "woocommerce_rest_customer_invalid_id",
+  "message": "Invalid customer ID.",
+  "data": {
+    "status": 404
+  }
+}
+```
+
+### Email Already Exists
+
+```json
+{
+  "code": "registration-error-email-exists",
+  "message": "An account is already registered with your email address. Please log in.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+### Invalid Email Format
+
+```json
+{
+  "code": "rest_invalid_param",
+  "message": "Invalid parameter(s): email",
+  "data": {
+    "status": 400,
+    "params": {
+      "email": "Email is not a valid email address."
+    }
+  }
+}
+```
+
+### Username Already Exists
+
+```json
+{
+  "code": "registration-error-username-exists",
+  "message": "An account is already registered with that username. Please choose another.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+## Security Considerations
+
+### Protecting Customer Data
+
+<Warning>
+Customer data includes personal information. Ensure you:
+
+- Use HTTPS for all API requests
+- Store API credentials securely
+- Limit API key permissions to necessary operations
+- Comply with GDPR and other privacy regulations
+- Never log or display customer passwords
+</Warning>
+
+### GDPR Compliance
+
+When working with customer data:
+
+1. **Data Access**: Customers have the right to access their data
+2. **Data Portability**: Allow customers to export their data
+3. **Right to Erasure**: Implement customer data deletion
+4. **Consent**: Ensure proper consent for data processing
+
+### Password Security
+
+```javascript
+// Good - Strong password with complexity
+const customer = {
+  email: 'user@example.com',
+  password: 'StrongP@ssw0rd123!'
+};
+
+// Bad - Weak password
+const customer = {
+  email: 'user@example.com',
+  password: 'password'
+};
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Orders API" icon="cart-shopping" href="/api/rest-api/orders">
+    View customer orders
+  </Card>
+  <Card title="Products API" icon="box" href="/api/rest-api/products">
+    Manage store products
+  </Card>
+</CardGroup>

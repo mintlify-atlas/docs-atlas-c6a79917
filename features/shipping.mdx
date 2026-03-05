@@ -1,0 +1,616 @@
+---
+title: Shipping Method API
+description: Create custom shipping methods and integrate with shipping zones in WooCommerce
+---
+
+# Shipping Method API
+
+The WooCommerce Shipping Method API enables you to create custom shipping methods that integrate with shipping zones and provide dynamic rate calculations for your store.
+
+## Overview
+
+Shipping methods in WooCommerce extend the `WC_Shipping_Method` class and can provide rates based on:
+
+- Cart contents (weight, dimensions, value)
+- Customer location (shipping zones)
+- Product shipping classes
+- Custom business logic
+
+<Info>
+Since WooCommerce 2.6, shipping methods use **shipping zones** and **instances**, allowing merchants to configure different settings for the same shipping method in different regions.
+</Info>
+
+## Creating a Shipping Method Plugin
+
+### Step 1: Plugin Setup
+
+Create your plugin file:
+
+```php
+<?php
+/**
+ * Plugin Name: Custom Shipping Method
+ * Description: A custom shipping method for WooCommerce
+ * Version: 1.0.0
+ * Author: Your Name
+ * Text Domain: custom-shipping-method
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+// Check if WooCommerce is active
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ), true ) ) {
+    return;
+}
+
+/**
+ * Initialize the shipping method.
+ */
+function init_custom_shipping_method() {
+    if ( ! class_exists( 'WC_Shipping_Method' ) ) {
+        return;
+    }
+    
+    require_once plugin_dir_path( __FILE__ ) . 'class-wc-shipping-custom.php';
+}
+add_action( 'woocommerce_shipping_init', 'init_custom_shipping_method' );
+
+/**
+ * Add the shipping method to WooCommerce.
+ *
+ * @param array $methods Existing shipping methods.
+ * @return array
+ */
+function add_custom_shipping_method( $methods ) {
+    $methods['custom_shipping'] = 'WC_Shipping_Custom';
+    return $methods;
+}
+add_filter( 'woocommerce_shipping_methods', 'add_custom_shipping_method' );
+```
+
+### Step 2: Create the Shipping Method Class
+
+Create `class-wc-shipping-custom.php`:
+
+```php
+<?php
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+/**
+ * Custom Shipping Method.
+ *
+ * @extends WC_Shipping_Method
+ */
+class WC_Shipping_Custom extends WC_Shipping_Method {
+    
+    /**
+     * Constructor.
+     *
+     * @param int $instance_id Shipping zone instance ID.
+     */
+    public function __construct( $instance_id = 0 ) {
+        $this->id                 = 'custom_shipping';
+        $this->instance_id        = absint( $instance_id );
+        $this->method_title       = __( 'Custom Shipping', 'custom-shipping-method' );
+        $this->method_description = __( 'Custom shipping method with advanced options', 'custom-shipping-method' );
+        
+        // Supported features
+        $this->supports = array(
+            'shipping-zones',
+            'instance-settings',
+            'instance-settings-modal',
+        );
+        
+        // Initialize
+        $this->init();
+    }
+    
+    /**
+     * Initialize shipping method.
+     */
+    public function init() {
+        // Load the settings
+        $this->init_form_fields();
+        $this->init_settings();
+        
+        // Get settings
+        $this->title      = $this->get_option( 'title' );
+        $this->tax_status = $this->get_option( 'tax_status' );
+        $this->cost       = $this->get_option( 'cost' );
+        
+        // Save settings
+        add_action( 'woocommerce_update_options_shipping_' . $this->id, array( $this, 'process_admin_options' ) );
+    }
+    
+    /**
+     * Define settings form fields.
+     */
+    public function init_form_fields() {
+        $this->instance_form_fields = array(
+            'title' => array(
+                'title'       => __( 'Method Title', 'custom-shipping-method' ),
+                'type'        => 'text',
+                'description' => __( 'This controls the title customers see during checkout.', 'custom-shipping-method' ),
+                'default'     => __( 'Custom Shipping', 'custom-shipping-method' ),
+                'desc_tip'    => true,
+            ),
+            'tax_status' => array(
+                'title'   => __( 'Tax Status', 'custom-shipping-method' ),
+                'type'    => 'select',
+                'class'   => 'wc-enhanced-select',
+                'default' => 'taxable',
+                'options' => array(
+                    'taxable' => __( 'Taxable', 'custom-shipping-method' ),
+                    'none'    => __( 'None', 'custom-shipping-method' ),
+                ),
+            ),
+            'cost' => array(
+                'title'       => __( 'Cost', 'custom-shipping-method' ),
+                'type'        => 'text',
+                'placeholder' => '0',
+                'description' => __( 'Enter a cost (excluding tax) or leave blank to disable.', 'custom-shipping-method' ),
+                'default'     => '0',
+                'desc_tip'    => true,
+            ),
+        );
+    }
+    
+    /**
+     * Calculate shipping rates.
+     *
+     * @param array $package Package information.
+     */
+    public function calculate_shipping( $package = array() ) {
+        $rate = array(
+            'id'      => $this->get_rate_id(),
+            'label'   => $this->title,
+            'cost'    => $this->cost,
+            'package' => $package,
+        );
+        
+        $this->add_rate( $rate );
+    }
+}
+```
+
+## Shipping Method Properties
+
+<ParamField path="id" type="string" required>
+  Unique identifier for your shipping method
+</ParamField>
+
+<ParamField path="instance_id" type="int">
+  Instance ID when used within a shipping zone
+</ParamField>
+
+<ParamField path="method_title" type="string" required>
+  Title shown in the admin shipping settings
+</ParamField>
+
+<ParamField path="method_description" type="string">
+  Description shown in the admin
+</ParamField>
+
+<ParamField path="supports" type="array">
+  Features supported by the method:
+  - `shipping-zones` - Works with shipping zones
+  - `instance-settings` - Has per-instance settings
+  - `instance-settings-modal` - Settings can be edited in a modal
+  - `settings` - Has global settings page
+</ParamField>
+
+<ParamField path="enabled" type="string" default="yes">
+  Whether the method is enabled
+</ParamField>
+
+<ParamField path="title" type="string">
+  Title displayed to customers at checkout
+</ParamField>
+
+<ParamField path="tax_status" type="string" default="taxable">
+  Tax status: `taxable` or `none`
+</ParamField>
+
+## Calculating Shipping Rates
+
+The `calculate_shipping()` method is called when WooCommerce needs shipping rates for a cart.
+
+### Basic Rate Calculation
+
+```php
+public function calculate_shipping( $package = array() ) {
+    $rate = array(
+        'id'       => $this->get_rate_id(),
+        'label'    => $this->title,
+        'cost'     => $this->cost,
+        'calc_tax' => 'per_order',
+        'package'  => $package,
+    );
+    
+    $this->add_rate( $rate );
+}
+```
+
+### Weight-Based Calculation
+
+```php
+public function calculate_shipping( $package = array() ) {
+    $weight = 0;
+    
+    // Calculate total weight
+    foreach ( $package['contents'] as $item_id => $values ) {
+        $weight += $values['data']->get_weight() * $values['quantity'];
+    }
+    
+    // Calculate cost based on weight
+    $cost = 0;
+    if ( $weight > 0 ) {
+        $cost = 5 + ( $weight * 0.5 ); // Base cost + per kg rate
+    }
+    
+    $rate = array(
+        'id'      => $this->get_rate_id(),
+        'label'   => $this->title,
+        'cost'    => $cost,
+        'package' => $package,
+    );
+    
+    $this->add_rate( $rate );
+}
+```
+
+### Cart Value-Based Calculation
+
+```php
+public function calculate_shipping( $package = array() ) {
+    $cart_total = 0;
+    
+    // Calculate cart total
+    foreach ( $package['contents'] as $item_id => $values ) {
+        $cart_total += $values['line_total'];
+    }
+    
+    // Free shipping over threshold
+    $free_shipping_threshold = 100;
+    $cost = $cart_total >= $free_shipping_threshold ? 0 : 10;
+    
+    $rate = array(
+        'id'      => $this->get_rate_id(),
+        'label'   => $this->title,
+        'cost'    => $cost,
+        'package' => $package,
+    );
+    
+    $this->add_rate( $rate );
+}
+```
+
+## Working with Shipping Classes
+
+Shipping classes allow different products to have different shipping costs.
+
+### Adding Shipping Class Support
+
+```php
+public function init_form_fields() {
+    $this->instance_form_fields = array(
+        'title' => array(
+            'title'   => __( 'Method Title', 'custom-shipping-method' ),
+            'type'    => 'text',
+            'default' => __( 'Custom Shipping', 'custom-shipping-method' ),
+        ),
+        'cost' => array(
+            'title'       => __( 'Base Cost', 'custom-shipping-method' ),
+            'type'        => 'text',
+            'placeholder' => '0',
+            'default'     => '0',
+        ),
+        'type' => array(
+            'title'   => __( 'Calculation Type', 'custom-shipping-method' ),
+            'type'    => 'select',
+            'class'   => 'wc-enhanced-select',
+            'default' => 'class',
+            'options' => array(
+                'class' => __( 'Per Class: Charge shipping for each class individually', 'custom-shipping-method' ),
+                'order' => __( 'Per Order: Charge shipping for the most expensive class', 'custom-shipping-method' ),
+            ),
+        ),
+    );
+    
+    // Add fields for each shipping class
+    $shipping_classes = WC()->shipping()->get_shipping_classes();
+    
+    if ( ! empty( $shipping_classes ) ) {
+        foreach ( $shipping_classes as $shipping_class ) {
+            if ( ! isset( $shipping_class->term_id ) ) {
+                continue;
+            }
+            
+            $this->instance_form_fields[ 'class_cost_' . $shipping_class->term_id ] = array(
+                'title'       => sprintf( __( '"%s" Shipping Class Cost', 'custom-shipping-method' ), esc_html( $shipping_class->name ) ),
+                'type'        => 'text',
+                'placeholder' => __( 'N/A', 'custom-shipping-method' ),
+                'description' => __( 'Enter a cost (excluding tax).', 'custom-shipping-method' ),
+                'default'     => '',
+                'desc_tip'    => true,
+            );
+        }
+        
+        $this->instance_form_fields['no_class_cost'] = array(
+            'title'       => __( 'No Shipping Class Cost', 'custom-shipping-method' ),
+            'type'        => 'text',
+            'placeholder' => __( 'N/A', 'custom-shipping-method' ),
+            'description' => __( 'Cost for products without a shipping class.', 'custom-shipping-method' ),
+            'default'     => '',
+            'desc_tip'    => true,
+        );
+    }
+}
+```
+
+### Calculate with Shipping Classes
+
+```php
+public function calculate_shipping( $package = array() ) {
+    $rate = array(
+        'id'      => $this->get_rate_id(),
+        'label'   => $this->title,
+        'cost'    => $this->get_option( 'cost' ),
+        'package' => $package,
+    );
+    
+    // Get shipping classes in the package
+    $found_shipping_classes = $this->find_shipping_classes( $package );
+    $highest_class_cost = 0;
+    
+    foreach ( $found_shipping_classes as $shipping_class => $products ) {
+        $shipping_class_term = get_term_by( 'slug', $shipping_class, 'product_shipping_class' );
+        $class_cost = $shipping_class_term && $shipping_class_term->term_id
+            ? $this->get_option( 'class_cost_' . $shipping_class_term->term_id, '' )
+            : $this->get_option( 'no_class_cost', '' );
+        
+        if ( '' === $class_cost ) {
+            continue;
+        }
+        
+        if ( 'class' === $this->get_option( 'type' ) ) {
+            $rate['cost'] += $class_cost;
+        } else {
+            $highest_class_cost = max( $highest_class_cost, $class_cost );
+        }
+    }
+    
+    if ( 'order' === $this->get_option( 'type' ) ) {
+        $rate['cost'] += $highest_class_cost;
+    }
+    
+    $this->add_rate( $rate );
+}
+
+/**
+ * Find shipping classes in package.
+ *
+ * @param array $package Package information.
+ * @return array
+ */
+public function find_shipping_classes( $package ) {
+    $found_shipping_classes = array();
+    
+    foreach ( $package['contents'] as $item_id => $values ) {
+        if ( $values['data']->needs_shipping() ) {
+            $found_class = $values['data']->get_shipping_class();
+            
+            if ( ! isset( $found_shipping_classes[ $found_class ] ) ) {
+                $found_shipping_classes[ $found_class ] = array();
+            }
+            
+            $found_shipping_classes[ $found_class ][ $item_id ] = $values;
+        }
+    }
+    
+    return $found_shipping_classes;
+}
+```
+
+## Advanced Features
+
+### Multiple Rates
+
+Offer multiple shipping options from one method:
+
+```php
+public function calculate_shipping( $package = array() ) {
+    // Standard shipping
+    $this->add_rate( array(
+        'id'      => $this->get_rate_id() . ':standard',
+        'label'   => __( 'Standard Shipping (5-7 days)', 'custom-shipping-method' ),
+        'cost'    => 5,
+        'package' => $package,
+    ) );
+    
+    // Express shipping
+    $this->add_rate( array(
+        'id'      => $this->get_rate_id() . ':express',
+        'label'   => __( 'Express Shipping (2-3 days)', 'custom-shipping-method' ),
+        'cost'    => 15,
+        'package' => $package,
+    ) );
+    
+    // Overnight shipping
+    $this->add_rate( array(
+        'id'      => $this->get_rate_id() . ':overnight',
+        'label'   => __( 'Overnight Shipping', 'custom-shipping-method' ),
+        'cost'    => 30,
+        'package' => $package,
+    ) );
+}
+```
+
+### Real-time API Integration
+
+```php
+public function calculate_shipping( $package = array() ) {
+    // Get customer location
+    $destination = array(
+        'country'  => $package['destination']['country'],
+        'state'    => $package['destination']['state'],
+        'postcode' => $package['destination']['postcode'],
+        'city'     => $package['destination']['city'],
+    );
+    
+    // Get package details
+    $weight = 0;
+    foreach ( $package['contents'] as $item ) {
+        $weight += $item['data']->get_weight() * $item['quantity'];
+    }
+    
+    try {
+        // Call shipping API
+        $response = wp_remote_post( 'https://api.shippingprovider.com/rates', array(
+            'body' => array(
+                'origin'      => $this->get_origin_address(),
+                'destination' => $destination,
+                'weight'      => $weight,
+                'api_key'     => $this->get_option( 'api_key' ),
+            ),
+        ) );
+        
+        if ( is_wp_error( $response ) ) {
+            return;
+        }
+        
+        $rates = json_decode( wp_remote_retrieve_body( $response ), true );
+        
+        foreach ( $rates as $api_rate ) {
+            $this->add_rate( array(
+                'id'      => $this->get_rate_id() . ':' . $api_rate['service_code'],
+                'label'   => $api_rate['service_name'],
+                'cost'    => $api_rate['price'],
+                'package' => $package,
+            ) );
+        }
+    } catch ( Exception $e ) {
+        // Log error but don't show rates if API fails
+        error_log( 'Shipping API error: ' . $e->getMessage() );
+    }
+}
+```
+
+### Conditional Availability
+
+```php
+public function is_available( $package ) {
+    // Not available for international orders
+    if ( $package['destination']['country'] !== 'US' ) {
+        return false;
+    }
+    
+    // Not available for orders over 50kg
+    $weight = 0;
+    foreach ( $package['contents'] as $item ) {
+        $weight += $item['data']->get_weight() * $item['quantity'];
+    }
+    
+    if ( $weight > 50 ) {
+        return false;
+    }
+    
+    return parent::is_available( $package );
+}
+```
+
+## Shipping Zones Integration
+
+<Steps>
+  <Step title="Navigate to Shipping Zones">
+    Go to **WooCommerce > Settings > Shipping** and create or edit a shipping zone.
+  </Step>
+  
+  <Step title="Add Shipping Method">
+    Click "Add shipping method" and select your custom method from the dropdown.
+  </Step>
+  
+  <Step title="Configure Instance Settings">
+    Click "Edit" to configure the method's settings for that specific zone.
+  </Step>
+  
+  <Step title="Set Method Order">
+    Drag and drop to reorder methods within the zone.
+  </Step>
+</Steps>
+
+<Info>
+Each instance of your shipping method in a zone can have different settings. For example, different costs for different regions.
+</Info>
+
+## Package Information
+
+The `$package` array passed to `calculate_shipping()` contains:
+
+```php
+array(
+    'contents'        => array(), // Cart items
+    'contents_cost'   => 0,       // Total cost of items
+    'applied_coupons' => array(), // Applied coupon codes
+    'user'            => array(
+        'ID' => 0,
+    ),
+    'destination'     => array(
+        'country'   => '',
+        'state'     => '',
+        'postcode'  => '',
+        'city'      => '',
+        'address'   => '',
+        'address_2' => '',
+    ),
+)
+```
+
+## Testing Your Shipping Method
+
+<Steps>
+  <Step title="Add to Shipping Zone">
+    Add your method to a test shipping zone.
+  </Step>
+  
+  <Step title="Create Test Orders">
+    - Add products to cart
+    - Enter different shipping addresses
+    - Verify rates calculate correctly
+  </Step>
+  
+  <Step title="Test Edge Cases">
+    - Empty cart
+    - Very heavy orders
+    - International addresses
+    - Free shipping thresholds
+  </Step>
+  
+  <Step title="Debug Output">
+    Use WooCommerce logging:
+    
+    ```php
+    $logger = wc_get_logger();
+    $logger->debug( 'Calculated shipping cost: ' . $cost, array( 'source' => 'custom-shipping' ) );
+    ```
+  </Step>
+</Steps>
+
+## Best Practices
+
+<Note>
+- **Performance**: Cache external API calls to avoid slow checkout
+- **Validation**: Always validate and sanitize settings input
+- **Error Handling**: Gracefully handle API failures
+- **Backwards Compatibility**: Support both instance and global settings if needed
+- **Logging**: Use WooCommerce's logger for debugging
+</Note>
+
+## Related Resources
+
+- [WC_Shipping_Method API Reference](https://woocommerce.github.io/code-reference/classes/WC-Shipping-Method.html)
+- [Shipping Zones Documentation](https://woocommerce.com/document/setting-up-shipping-zones/)
+- [WooCommerce Settings API](/docs/settings-api)

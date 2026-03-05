@@ -1,0 +1,739 @@
+---
+title: Products REST API
+description: Manage products through the WooCommerce REST API - list, create, update, and delete products
+---
+
+# Products API
+
+The Products endpoint allows you to create, read, update, and delete products in your WooCommerce store.
+
+## The Product Object
+
+### Product Properties
+
+<ResponseField name="id" type="integer" required>
+  Unique identifier for the product. Read-only.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Product name.
+</ResponseField>
+
+<ResponseField name="slug" type="string">
+  Product slug. Auto-generated from name if not provided.
+</ResponseField>
+
+<ResponseField name="permalink" type="string">
+  Product URL. Read-only.
+</ResponseField>
+
+<ResponseField name="date_created" type="string">
+  The date the product was created, in ISO8601 format. Read-only.
+</ResponseField>
+
+<ResponseField name="date_modified" type="string">
+  The date the product was last modified, in ISO8601 format. Read-only.
+</ResponseField>
+
+<ResponseField name="type" type="string" default="simple">
+  Product type. Options: `simple`, `grouped`, `external`, `variable`
+</ResponseField>
+
+<ResponseField name="status" type="string" default="publish">
+  Product status. Options: `draft`, `pending`, `private`, `publish`
+</ResponseField>
+
+<ResponseField name="featured" type="boolean" default="false">
+  Featured product.
+</ResponseField>
+
+<ResponseField name="catalog_visibility" type="string" default="visible">
+  Catalog visibility. Options: `visible`, `catalog`, `search`, `hidden`
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Product description (HTML).
+</ResponseField>
+
+<ResponseField name="short_description" type="string">
+  Product short description (HTML).
+</ResponseField>
+
+<ResponseField name="sku" type="string">
+  Unique product identifier (Stock Keeping Unit).
+</ResponseField>
+
+<ResponseField name="price" type="string">
+  Current product price. Read-only.
+</ResponseField>
+
+<ResponseField name="regular_price" type="string">
+  Product regular price.
+</ResponseField>
+
+<ResponseField name="sale_price" type="string">
+  Product sale price.
+</ResponseField>
+
+<ResponseField name="on_sale" type="boolean">
+  Whether the product is on sale. Read-only.
+</ResponseField>
+
+<ResponseField name="stock_status" type="string" default="instock">
+  Stock status. Options: `instock`, `outofstock`, `onbackorder`
+</ResponseField>
+
+<ResponseField name="stock_quantity" type="integer">
+  Stock quantity. Only applicable if managing stock.
+</ResponseField>
+
+<ResponseField name="manage_stock" type="boolean" default="false">
+  Enable stock management at product level.
+</ResponseField>
+
+<ResponseField name="categories" type="array">
+  List of product categories.
+  ```json
+  [
+    {
+      "id": 15,
+      "name": "Clothing",
+      "slug": "clothing"
+    }
+  ]
+  ```
+</ResponseField>
+
+<ResponseField name="images" type="array">
+  List of product images.
+  ```json
+  [
+    {
+      "id": 456,
+      "src": "https://example.com/image.jpg",
+      "name": "Product Image",
+      "alt": "Product photo"
+    }
+  ]
+  ```
+</ResponseField>
+
+## List All Products
+
+Retrieve a list of all products in your store.
+
+<CodeGroup>
+```bash cURL
+curl https://example.com/wp-json/wc/v3/products \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+const response = await api.get('/products');
+console.log(response.data);
+```
+
+```python Python
+response = requests.get(
+    'https://example.com/wp-json/wc/v3/products',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+products = response.json()
+```
+
+```php PHP
+$products = $woocommerce->get('products');
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="1">
+  Current page of the collection.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="10">
+  Maximum number of items to return (max 100).
+</ParamField>
+
+<ParamField query="search" type="string">
+  Limit results to those matching a string.
+</ParamField>
+
+<ParamField query="after" type="string">
+  Limit response to products published after a given ISO8601 date.
+</ParamField>
+
+<ParamField query="before" type="string">
+  Limit response to products published before a given ISO8601 date.
+</ParamField>
+
+<ParamField query="status" type="string" default="any">
+  Limit result set to products with specific status. Options: `any`, `draft`, `pending`, `private`, `publish`
+</ParamField>
+
+<ParamField query="type" type="string">
+  Limit result set to products with specific type. Options: `simple`, `grouped`, `external`, `variable`
+</ParamField>
+
+<ParamField query="sku" type="string">
+  Limit result set to products with a specific SKU.
+</ParamField>
+
+<ParamField query="featured" type="boolean">
+  Limit result set to featured products.
+</ParamField>
+
+<ParamField query="category" type="string">
+  Limit result set to products in specific category ID(s). Comma-separated list.
+</ParamField>
+
+<ParamField query="tag" type="string">
+  Limit result set to products with specific tag ID(s). Comma-separated list.
+</ParamField>
+
+<ParamField query="on_sale" type="boolean">
+  Limit result set to products on sale.
+</ParamField>
+
+<ParamField query="min_price" type="string">
+  Limit result set to products based on minimum price.
+</ParamField>
+
+<ParamField query="max_price" type="string">
+  Limit result set to products based on maximum price.
+</ParamField>
+
+<ParamField query="stock_status" type="string">
+  Limit result set to products with specified stock status. Options: `instock`, `outofstock`, `onbackorder`
+</ParamField>
+
+<ParamField query="orderby" type="string" default="date">
+  Sort collection by attribute. Options: `date`, `id`, `title`, `slug`, `price`, `popularity`, `rating`
+</ParamField>
+
+<ParamField query="order" type="string" default="desc">
+  Order sort direction. Options: `asc`, `desc`
+</ParamField>
+
+### Example Response
+
+```json
+[
+  {
+    "id": 123,
+    "name": "Premium T-Shirt",
+    "slug": "premium-t-shirt",
+    "permalink": "https://example.com/product/premium-t-shirt/",
+    "date_created": "2024-01-15T10:30:00",
+    "date_modified": "2024-01-20T14:45:00",
+    "type": "simple",
+    "status": "publish",
+    "featured": false,
+    "catalog_visibility": "visible",
+    "description": "<p>High-quality cotton t-shirt</p>",
+    "short_description": "<p>Comfortable premium t-shirt</p>",
+    "sku": "TSHIRT-001",
+    "price": "24.99",
+    "regular_price": "29.99",
+    "sale_price": "24.99",
+    "on_sale": true,
+    "purchasable": true,
+    "total_sales": 45,
+    "virtual": false,
+    "downloadable": false,
+    "downloads": [],
+    "download_limit": -1,
+    "download_expiry": -1,
+    "tax_status": "taxable",
+    "tax_class": "",
+    "manage_stock": true,
+    "stock_quantity": 50,
+    "stock_status": "instock",
+    "backorders": "no",
+    "backorders_allowed": false,
+    "backordered": false,
+    "sold_individually": false,
+    "weight": "0.5",
+    "dimensions": {
+      "length": "20",
+      "width": "15",
+      "height": "2"
+    },
+    "shipping_required": true,
+    "shipping_taxable": true,
+    "shipping_class": "",
+    "shipping_class_id": 0,
+    "reviews_allowed": true,
+    "average_rating": "4.5",
+    "rating_count": 12,
+    "categories": [
+      {
+        "id": 15,
+        "name": "Clothing",
+        "slug": "clothing"
+      }
+    ],
+    "tags": [
+      {
+        "id": 23,
+        "name": "Summer",
+        "slug": "summer"
+      }
+    ],
+    "images": [
+      {
+        "id": 456,
+        "date_created": "2024-01-15T10:30:00",
+        "date_modified": "2024-01-15T10:30:00",
+        "src": "https://example.com/wp-content/uploads/2024/01/tshirt.jpg",
+        "name": "tshirt.jpg",
+        "alt": "Premium T-Shirt"
+      }
+    ],
+    "attributes": [],
+    "default_attributes": [],
+    "variations": [],
+    "grouped_products": [],
+    "menu_order": 0,
+    "meta_data": []
+  }
+]
+```
+
+## Retrieve a Product
+
+Get details of a single product by ID.
+
+<CodeGroup>
+```bash cURL
+curl https://example.com/wp-json/wc/v3/products/123 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+const response = await api.get('/products/123');
+console.log(response.data);
+```
+
+```python Python
+response = requests.get(
+    'https://example.com/wp-json/wc/v3/products/123',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+product = response.json()
+```
+
+```php PHP
+$product = $woocommerce->get('products/123');
+```
+</CodeGroup>
+
+## Create a Product
+
+Create a new product in your store.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://example.com/wp-json/wc/v3/products \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Premium Hoodie",
+    "type": "simple",
+    "regular_price": "49.99",
+    "description": "Comfortable premium hoodie made from organic cotton.",
+    "short_description": "Premium organic cotton hoodie",
+    "categories": [
+      {
+        "id": 15
+      }
+    ],
+    "images": [
+      {
+        "src": "https://example.com/images/hoodie.jpg"
+      }
+    ]
+  }'
+```
+
+```javascript JavaScript
+const newProduct = {
+  name: 'Premium Hoodie',
+  type: 'simple',
+  regular_price: '49.99',
+  description: 'Comfortable premium hoodie made from organic cotton.',
+  short_description: 'Premium organic cotton hoodie',
+  categories: [
+    { id: 15 }
+  ],
+  images: [
+    { src: 'https://example.com/images/hoodie.jpg' }
+  ]
+};
+
+const response = await api.post('/products', newProduct);
+console.log(response.data);
+```
+
+```python Python
+data = {
+    'name': 'Premium Hoodie',
+    'type': 'simple',
+    'regular_price': '49.99',
+    'description': 'Comfortable premium hoodie made from organic cotton.',
+    'short_description': 'Premium organic cotton hoodie',
+    'categories': [{'id': 15}],
+    'images': [{'src': 'https://example.com/images/hoodie.jpg'}]
+}
+
+response = requests.post(
+    'https://example.com/wp-json/wc/v3/products',
+    json=data,
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+product = response.json()
+```
+
+```php PHP
+$data = [
+    'name' => 'Premium Hoodie',
+    'type' => 'simple',
+    'regular_price' => '49.99',
+    'description' => 'Comfortable premium hoodie made from organic cotton.',
+    'short_description' => 'Premium organic cotton hoodie',
+    'categories' => [
+        ['id' => 15]
+    ],
+    'images' => [
+        ['src' => 'https://example.com/images/hoodie.jpg']
+    ]
+];
+
+$product = $woocommerce->post('products', $data);
+```
+</CodeGroup>
+
+### Required Fields
+
+<ParamField body="name" type="string" required>
+  Product name
+</ParamField>
+
+### Optional Fields
+
+<ParamField body="type" type="string" default="simple">
+  Product type: `simple`, `grouped`, `external`, `variable`
+</ParamField>
+
+<ParamField body="regular_price" type="string">
+  Product regular price
+</ParamField>
+
+<ParamField body="sale_price" type="string">
+  Product sale price
+</ParamField>
+
+<ParamField body="description" type="string">
+  Product description (supports HTML)
+</ParamField>
+
+<ParamField body="short_description" type="string">
+  Product short description (supports HTML)
+</ParamField>
+
+<ParamField body="sku" type="string">
+  Unique SKU (Stock Keeping Unit)
+</ParamField>
+
+<ParamField body="manage_stock" type="boolean" default="false">
+  Enable stock management
+</ParamField>
+
+<ParamField body="stock_quantity" type="integer">
+  Stock quantity (requires `manage_stock` to be true)
+</ParamField>
+
+<ParamField body="stock_status" type="string" default="instock">
+  Stock status: `instock`, `outofstock`, `onbackorder`
+</ParamField>
+
+<ParamField body="categories" type="array">
+  List of category IDs
+  ```json
+  [{"id": 15}, {"id": 23}]
+  ```
+</ParamField>
+
+<ParamField body="images" type="array">
+  List of product images
+  ```json
+  [{"src": "https://example.com/image.jpg"}]
+  ```
+</ParamField>
+
+## Update a Product
+
+Update an existing product.
+
+<CodeGroup>
+```bash cURL
+curl -X PUT https://example.com/wp-json/wc/v3/products/123 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "regular_price": "54.99",
+    "sale_price": "44.99"
+  }'
+```
+
+```javascript JavaScript
+const updates = {
+  regular_price: '54.99',
+  sale_price: '44.99'
+};
+
+const response = await api.put('/products/123', updates);
+console.log(response.data);
+```
+
+```python Python
+data = {
+    'regular_price': '54.99',
+    'sale_price': '44.99'
+}
+
+response = requests.put(
+    'https://example.com/wp-json/wc/v3/products/123',
+    json=data,
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+product = response.json()
+```
+
+```php PHP
+$data = [
+    'regular_price' => '54.99',
+    'sale_price' => '44.99'
+];
+
+$product = $woocommerce->put('products/123', $data);
+```
+</CodeGroup>
+
+## Delete a Product
+
+Delete a product permanently or move it to trash.
+
+<CodeGroup>
+```bash cURL (Move to Trash)
+curl -X DELETE https://example.com/wp-json/wc/v3/products/123 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```bash cURL (Permanent Delete)
+curl -X DELETE https://example.com/wp-json/wc/v3/products/123?force=true \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+// Move to trash
+await api.delete('/products/123');
+
+// Permanent delete
+await api.delete('/products/123', { params: { force: true } });
+```
+
+```python Python
+# Move to trash
+requests.delete(
+    'https://example.com/wp-json/wc/v3/products/123',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+
+# Permanent delete
+requests.delete(
+    'https://example.com/wp-json/wc/v3/products/123',
+    params={'force': True},
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+```
+
+```php PHP
+// Move to trash
+$woocommerce->delete('products/123');
+
+// Permanent delete
+$woocommerce->delete('products/123', ['force' => true]);
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField query="force" type="boolean" default="false">
+  Set to `true` to permanently delete the product. Otherwise, it will be moved to trash.
+</ParamField>
+
+## Batch Update Products
+
+Create, update, and delete multiple products in a single request.
+
+```bash
+curl -X POST https://example.com/wp-json/wc/v3/products/batch \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "create": [
+      {
+        "name": "Product 1",
+        "type": "simple",
+        "regular_price": "10.00"
+      },
+      {
+        "name": "Product 2",
+        "type": "simple",
+        "regular_price": "20.00"
+      }
+    ],
+    "update": [
+      {
+        "id": 123,
+        "regular_price": "15.00"
+      }
+    ],
+    "delete": [
+      456
+    ]
+  }'
+```
+
+## Product Variations
+
+For variable products, you can manage variations through a sub-endpoint.
+
+### List Product Variations
+
+```bash
+curl https://example.com/wp-json/wc/v3/products/123/variations \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Create a Variation
+
+```bash
+curl -X POST https://example.com/wp-json/wc/v3/products/123/variations \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "regular_price": "19.99",
+    "attributes": [
+      {
+        "id": 1,
+        "option": "Large"
+      }
+    ]
+  }'
+```
+
+## Common Use Cases
+
+### Update Stock Quantity
+
+```javascript
+await api.put('/products/123', {
+  manage_stock: true,
+  stock_quantity: 100,
+  stock_status: 'instock'
+});
+```
+
+### Set Product on Sale
+
+```javascript
+await api.put('/products/123', {
+  regular_price: '99.99',
+  sale_price: '79.99'
+});
+```
+
+### Add Product to Category
+
+```javascript
+await api.put('/products/123', {
+  categories: [
+    { id: 15 },
+    { id: 23 }
+  ]
+});
+```
+
+### Search Products by SKU
+
+```bash
+curl "https://example.com/wp-json/wc/v3/products?sku=TSHIRT-001" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Get Featured Products
+
+```bash
+curl "https://example.com/wp-json/wc/v3/products?featured=true" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Filter by Price Range
+
+```bash
+curl "https://example.com/wp-json/wc/v3/products?min_price=10&max_price=50" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+## Error Handling
+
+### Invalid Product ID
+
+```json
+{
+  "code": "woocommerce_rest_product_invalid_id",
+  "message": "Invalid product ID.",
+  "data": {
+    "status": 404
+  }
+}
+```
+
+### Missing Required Field
+
+```json
+{
+  "code": "woocommerce_rest_product_name_required",
+  "message": "The product name is required.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+### Duplicate SKU
+
+```json
+{
+  "code": "woocommerce_rest_product_sku_already_exists",
+  "message": "The SKU already exists on another product.",
+  "data": {
+    "status": 400,
+    "resource_id": 456
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Orders API" icon="cart-shopping" href="/api/rest-api/orders">
+    Manage customer orders
+  </Card>
+  <Card title="Customers API" icon="users" href="/api/rest-api/customers">
+    Work with customer data
+  </Card>
+</CardGroup>

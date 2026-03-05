@@ -1,0 +1,621 @@
+---
+title: Payment Token API
+description: Store and manage payment tokens for saved payment methods
+---
+
+The Payment Token API allows payment gateways to securely store payment method tokens and let customers manage them from their account. Introduced in WooCommerce 2.6, this API provides a standardized way to handle tokenization.
+
+## Overview
+
+The Payment Token API consists of three main components:
+
+- **WC_Payment_Tokens**: Static class for managing tokens (get, delete, set defaults)
+- **WC_Payment_Token**: Abstract base class for creating token types
+- **WC_Payment_Token_CC** and **WC_Payment_Token_eCheck**: Built-in token types
+
+## Token Types
+
+WooCommerce includes two token types out of the box:
+
+### Credit Card Tokens (WC_Payment_Token_CC)
+
+Stores credit card information:
+- Card type (Visa, MasterCard, etc.)
+- Last 4 digits
+- Expiration month and year
+
+### eCheck Tokens (WC_Payment_Token_eCheck)
+
+Stores bank account information:
+- Last 4 digits of account number
+
+You can also create custom token types by extending `WC_Payment_Token`.
+
+## Adding Tokenization to Your Gateway
+
+<Steps>
+  <Step title="Extend the correct base class">
+    WooCommerce provides specialized base classes for common token types:
+
+    ```php
+    // For credit card tokens
+    class WC_Gateway_Your_Gateway extends WC_Payment_Gateway_CC {
+        // ...
+    }
+
+    // For eCheck tokens
+    class WC_Gateway_Your_Gateway extends WC_Payment_Gateway_eCheck {
+        // ...
+    }
+
+    // Or extend the base class
+    class WC_Gateway_Your_Gateway extends WC_Payment_Gateway {
+        // ...
+    }
+    ```
+
+    See `/plugins/woocommerce/includes/gateways/class-wc-payment-gateway-cc.php` for the CC implementation.
+  </Step>
+
+  <Step title="Declare tokenization support">
+    Add `'tokenization'` to your gateway's `$supports` array:
+
+    ```php
+    public function __construct() {
+        // ... other constructor code ...
+
+        $this->supports = array(
+            'products',
+            'refunds',
+            'tokenization',
+        );
+    }
+    ```
+
+    See `/plugins/woocommerce/includes/abstracts/abstract-wc-payment-gateway.php:131` for the supports property.
+  </Step>
+
+  <Step title="Implement add_payment_method()">
+    Handle adding payment methods from the My Account page:
+
+    ```php
+    public function add_payment_method() {
+        // Validate posted data
+        if ( empty( $_POST['your_gateway_token'] ) ) {
+            wc_add_notice( __( 'Payment token is required.', 'your-text-domain' ), 'error' );
+            return array(
+                'result'   => 'failure',
+                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+            );
+        }
+
+        // Get token from payment provider
+        $provider_token = sanitize_text_field( $_POST['your_gateway_token'] );
+
+        // Create WooCommerce token
+        $token = new WC_Payment_Token_CC();
+        $token->set_token( $provider_token );
+        $token->set_gateway_id( $this->id );
+        $token->set_card_type( 'visa' );
+        $token->set_last4( '1234' );
+        $token->set_expiry_month( '12' );
+        $token->set_expiry_year( '2025' );
+        $token->set_user_id( get_current_user_id() );
+
+        // Save token
+        if ( $token->save() ) {
+            return array(
+                'result'   => 'success',
+                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+            );
+        }
+
+        wc_add_notice( __( 'Unable to save payment method.', 'your-text-domain' ), 'error' );
+        return array(
+            'result'   => 'failure',
+            'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+        );
+    }
+    ```
+
+    See `/plugins/woocommerce/includes/abstracts/abstract-wc-payment-gateway.php:698-703` for the base implementation.
+  </Step>
+
+  <Step title="Save tokens during checkout">
+    In your `process_payment()` method, check if the customer wants to save the payment method:
+
+    ```php
+    public function process_payment( $order_id ) {
+        $order = wc_get_order( $order_id );
+
+        // Check if saving a new payment method
+        $save_method = isset( $_POST[ 'wc-' . $this->id . '-new-payment-method' ] )
+            && ! empty( $_POST[ 'wc-' . $this->id . '-new-payment-method' ] );
+
+        // Process payment with provider
+        $result = $this->process_payment_with_provider( $order );
+
+        if ( $result['success'] ) {
+            // Save token if requested
+            if ( $save_method && $result['token'] ) {
+                $token = new WC_Payment_Token_CC();
+                $token->set_token( $result['token'] );
+                $token->set_gateway_id( $this->id );
+                $token->set_card_type( $result['card_type'] );
+                $token->set_last4( $result['last4'] );
+                $token->set_expiry_month( $result['exp_month'] );
+                $token->set_expiry_year( $result['exp_year'] );
+                $token->set_user_id( get_current_user_id() );
+                $token->save();
+
+                // Associate token with order
+                $order->add_payment_token( $token );
+            }
+
+            $order->payment_complete( $result['transaction_id'] );
+            WC()->cart->empty_cart();
+
+            return array(
+                'result'   => 'success',
+                'redirect' => $this->get_return_url( $order ),
+            );
+        }
+
+        return array( 'result' => 'failure' );
+    }
+    ```
+  </Step>
+
+  <Step title="Use saved tokens">
+    Retrieve and use saved tokens when processing payments:
+
+    ```php
+    public function process_payment( $order_id ) {
+        $order = wc_get_order( $order_id );
+
+        // Check if using a saved token
+        $token_id = isset( $_POST[ 'wc-' . $this->id . '-payment-token' ] )
+            ? wc_clean( $_POST[ 'wc-' . $this->id . '-payment-token' ] )
+            : 'new';
+
+        if ( 'new' !== $token_id ) {
+            // Load the token
+            $token = WC_Payment_Tokens::get( $token_id );
+
+            // Verify token belongs to current user
+            if ( ! $token || $token->get_user_id() !== get_current_user_id() ) {
+                wc_add_notice( __( 'Invalid payment method.', 'your-text-domain' ), 'error' );
+                return array( 'result' => 'failure' );
+            }
+
+            // Process payment with saved token
+            $result = $this->process_payment_with_token(
+                $order,
+                $token->get_token()
+            );
+
+            if ( $result['success'] ) {
+                $order->payment_complete( $result['transaction_id'] );
+                WC()->cart->empty_cart();
+
+                return array(
+                    'result'   => 'success',
+                    'redirect' => $this->get_return_url( $order ),
+                );
+            }
+        }
+
+        // Process as new payment method
+        // ...
+    }
+    ```
+  </Step>
+</Steps>
+
+## Working with Credit Card Tokens
+
+The `WC_Payment_Token_CC` class handles credit card tokens.
+
+### Creating a Credit Card Token
+
+```php
+$token = new WC_Payment_Token_CC();
+$token->set_token( 'tok_abc123' );           // Token from payment provider
+$token->set_gateway_id( 'your_gateway' );    // Your gateway ID
+$token->set_card_type( 'visa' );             // Card type
+$token->set_last4( '4242' );                 // Last 4 digits
+$token->set_expiry_month( '12' );            // MM format
+$token->set_expiry_year( '2025' );           // YYYY format
+$token->set_user_id( get_current_user_id() );
+
+if ( $token->save() ) {
+    // Token saved successfully
+}
+```
+
+See `/plugins/woocommerce/includes/payment-tokens/class-wc-payment-token-cc.php` for the complete implementation.
+
+### Credit Card Token Methods
+
+<ParamField path="get_card_type()" type="string">
+  Get the card type (visa, mastercard, etc.)
+</ParamField>
+
+<ParamField path="set_card_type( $type )" type="void">
+  Set the card type
+</ParamField>
+
+<ParamField path="get_last4()" type="string">
+  Get the last 4 digits
+</ParamField>
+
+<ParamField path="set_last4( $last4 )" type="void">
+  Set the last 4 digits
+</ParamField>
+
+<ParamField path="get_expiry_month()" type="string">
+  Get expiration month (MM format)
+</ParamField>
+
+<ParamField path="set_expiry_month( $month )" type="void">
+  Set expiration month (MM format)
+</ParamField>
+
+<ParamField path="get_expiry_year()" type="string">
+  Get expiration year (YYYY format)
+</ParamField>
+
+<ParamField path="set_expiry_year( $year )" type="void">
+  Set expiration year (YYYY format)
+</ParamField>
+
+### Supported Card Types
+
+```php
+array(
+    'mastercard'       => 'MasterCard',
+    'visa'             => 'Visa',
+    'discover'         => 'Discover',
+    'american express' => 'American Express',
+    'diners'           => 'Diners',
+    'jcb'              => 'JCB',
+);
+```
+
+Add custom types with the `woocommerce_credit_card_type_labels` filter.
+
+## WC_Payment_Tokens Static Methods
+
+The `WC_Payment_Tokens` class provides static methods for managing tokens.
+
+### Get Customer Tokens
+
+```php
+// Get all tokens for current user
+$tokens = WC_Payment_Tokens::get_customer_tokens( get_current_user_id() );
+
+// Get tokens for a specific gateway
+$tokens = WC_Payment_Tokens::get_customer_tokens(
+    get_current_user_id(),
+    'your_gateway'
+);
+
+// Iterate through tokens
+foreach ( $tokens as $token ) {
+    echo $token->get_display_name();
+}
+```
+
+See `/plugins/woocommerce/includes/class-wc-payment-tokens.php:68-89` for the implementation.
+
+### Get Default Token
+
+```php
+$token = WC_Payment_Tokens::get_customer_default_token( get_current_user_id() );
+
+if ( $token ) {
+    echo 'Default: ' . $token->get_display_name();
+}
+```
+
+### Get Order Tokens
+
+```php
+// Via WC_Payment_Tokens
+$tokens = WC_Payment_Tokens::get_order_tokens( 25 );
+
+// Via WC_Order
+$order = wc_get_order( 25 );
+$tokens = $order->get_payment_tokens();
+```
+
+### Get Single Token
+
+```php
+$token = WC_Payment_Tokens::get( 42 );
+
+if ( $token ) {
+    echo $token->get_token(); // Get provider token string
+}
+```
+
+### Delete Token
+
+```php
+WC_Payment_Tokens::delete( 52 );
+```
+
+### Set Default Token
+
+```php
+// Set token 82 as default for user 17
+WC_Payment_Tokens::set_users_default( 17, 82 );
+```
+
+See `/plugins/woocommerce/includes/class-wc-payment-tokens.php:200-211` for the implementation.
+
+## Base Token Methods
+
+All token types inherit these methods from `WC_Payment_Token`:
+
+### Token Properties
+
+```php
+$token->get_id();                    // Get token ID
+$token->get_token();                 // Get provider token string
+$token->get_type();                  // Get type (CC, eCheck, etc.)
+$token->get_user_id();               // Get associated user ID
+$token->get_gateway_id();            // Get gateway ID
+$token->is_default();                // Check if default
+$token->get_display_name();          // Get formatted display name
+```
+
+See `/plugins/woocommerce/includes/abstracts/abstract-wc-payment-token.php:96-155` for getter methods.
+
+### Setting Token Data
+
+```php
+$token->set_token( 'tok_abc123' );
+$token->set_user_id( 42 );
+$token->set_gateway_id( 'your_gateway' );
+$token->set_default( true );
+```
+
+<Warning>
+Set methods do not save to the database. You must call `save()`, `create()`, or `update()` to persist changes.
+</Warning>
+
+### Saving Tokens
+
+```php
+// For new tokens
+$token = new WC_Payment_Token_CC();
+// ... set properties ...
+$token->create(); // or $token->save()
+
+// For existing tokens
+$token = WC_Payment_Tokens::get( 42 );
+$token->set_expiry_year( '2026' );
+$token->update(); // or $token->save()
+
+// save() automatically calls create() or update()
+$token->save();
+```
+
+### Validation
+
+```php
+$token = new WC_Payment_Token_CC();
+$token->set_token( 'tok_abc123' );
+$token->set_last4( '4242' );
+$token->set_expiry_year( '2025' );
+$token->set_expiry_month( '1' ); // Wrong format!
+
+if ( $token->validate() ) {
+    $token->save();
+} else {
+    // Validation failed
+}
+```
+
+## Creating Custom Token Types
+
+Extend `WC_Payment_Token` to create custom token types:
+
+```php
+class WC_Payment_Token_Custom extends WC_Payment_Token {
+    protected $type = 'Custom';
+
+    protected $extra_data = array(
+        'custom_field' => '',
+    );
+
+    public function validate() {
+        if ( false === parent::validate() ) {
+            return false;
+        }
+
+        if ( ! $this->get_custom_field() ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public function get_custom_field() {
+        return $this->get_meta( 'custom_field' );
+    }
+
+    public function set_custom_field( $value ) {
+        $this->add_meta_data( 'custom_field', $value, true );
+    }
+
+    public function get_display_name( $deprecated = '' ) {
+        return sprintf(
+            __( 'Custom token ending in %s', 'your-text-domain' ),
+            $this->get_custom_field()
+        );
+    }
+}
+```
+
+<Note>
+The `$type` property must match the class name suffix: `WC_Payment_Token_{$type}`
+</Note>
+
+## Payment Gateway Integration
+
+When extending `WC_Payment_Gateway_CC`, tokenization forms are automatically displayed:
+
+```php
+class WC_Gateway_Your_Gateway extends WC_Payment_Gateway_CC {
+    public function __construct() {
+        // ... constructor code ...
+        $this->supports = array( 'tokenization' );
+    }
+
+    // Tokenization forms are handled automatically
+    // by the parent class payment_fields() method
+}
+```
+
+See `/plugins/woocommerce/includes/gateways/class-wc-payment-gateway-cc.php:28-37` for the payment fields implementation.
+
+## Security Considerations
+
+<Warning>
+- **Never** store complete card numbers or CVV codes
+- Always validate token ownership before use
+- Use HTTPS for all payment pages
+- Follow PCI DSS compliance guidelines
+- Store only tokens from your payment provider
+</Warning>
+
+### Validating Token Ownership
+
+```php
+public function process_payment( $order_id ) {
+    $token_id = wc_clean( $_POST[ 'wc-' . $this->id . '-payment-token' ] );
+    $token = WC_Payment_Tokens::get( $token_id );
+
+    // Always validate token belongs to current user
+    if ( ! $token || $token->get_user_id() !== get_current_user_id() ) {
+        wc_add_notice( __( 'Invalid payment method.', 'your-text-domain' ), 'error' );
+        return array( 'result' => 'failure' );
+    }
+
+    // Safe to use token
+}
+```
+
+## Display Token Information
+
+Tokens provide a formatted display name:
+
+```php
+$token = WC_Payment_Tokens::get( 42 );
+
+// For credit cards: "Visa ending in 4242 (expires 12/25)"
+echo $token->get_display_name();
+```
+
+See `/plugins/woocommerce/includes/payment-tokens/class-wc-payment-token-cc.php:50-60` for the display name implementation.
+
+## Complete Example
+
+Here's a complete example of tokenization support:
+
+```php
+class WC_Gateway_Your_Gateway extends WC_Payment_Gateway_CC {
+
+    public function __construct() {
+        $this->id                 = 'your_gateway';
+        $this->method_title       = 'Your Gateway';
+        $this->method_description = 'Payment gateway with tokenization';
+        $this->has_fields         = true;
+        $this->supports           = array(
+            'products',
+            'tokenization',
+            'refunds',
+        );
+
+        $this->init_form_fields();
+        $this->init_settings();
+
+        $this->title = $this->get_option( 'title' );
+    }
+
+    public function add_payment_method() {
+        $provider_token = $this->get_token_from_provider();
+
+        if ( ! $provider_token ) {
+            wc_add_notice( __( 'Unable to add payment method.', 'your-text-domain' ), 'error' );
+            return array(
+                'result'   => 'failure',
+                'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+            );
+        }
+
+        $token = new WC_Payment_Token_CC();
+        $token->set_token( $provider_token['token'] );
+        $token->set_gateway_id( $this->id );
+        $token->set_card_type( $provider_token['card_type'] );
+        $token->set_last4( $provider_token['last4'] );
+        $token->set_expiry_month( $provider_token['exp_month'] );
+        $token->set_expiry_year( $provider_token['exp_year'] );
+        $token->set_user_id( get_current_user_id() );
+
+        $token->save();
+
+        return array(
+            'result'   => 'success',
+            'redirect' => wc_get_endpoint_url( 'payment-methods' ),
+        );
+    }
+
+    public function process_payment( $order_id ) {
+        $order = wc_get_order( $order_id );
+        $token_id = wc_clean( $_POST[ 'wc-' . $this->id . '-payment-token' ] ?? 'new' );
+
+        if ( 'new' !== $token_id ) {
+            $token = WC_Payment_Tokens::get( $token_id );
+
+            if ( ! $token || $token->get_user_id() !== get_current_user_id() ) {
+                return array( 'result' => 'failure' );
+            }
+
+            $result = $this->charge_with_token( $order, $token->get_token() );
+        } else {
+            $result = $this->charge_with_new_card( $order );
+
+            // Save token if requested
+            if ( $result['success'] && ! empty( $_POST[ 'wc-' . $this->id . '-new-payment-method' ] ) ) {
+                $this->save_payment_token( $result['token_data'] );
+            }
+        }
+
+        if ( $result['success'] ) {
+            $order->payment_complete( $result['transaction_id'] );
+            WC()->cart->empty_cart();
+
+            return array(
+                'result'   => 'success',
+                'redirect' => $this->get_return_url( $order ),
+            );
+        }
+
+        return array( 'result' => 'failure' );
+    }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payment Gateway API" icon="credit-card" href="/api/php/payment-gateway-api">
+    Learn about creating payment gateways
+  </Card>
+  <Card title="WC_Payment_Token Class Reference" icon="book" href="https://woocommerce.github.io/code-reference/classes/WC-Payment-Token.html">
+    View complete API documentation
+  </Card>
+</CardGroup>

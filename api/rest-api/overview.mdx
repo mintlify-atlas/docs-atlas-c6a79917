@@ -1,0 +1,300 @@
+---
+title: REST API Overview
+description: Introduction to the WooCommerce REST API, versioning, endpoints, and base URLs
+---
+
+# WooCommerce REST API Overview
+
+The WooCommerce REST API provides a powerful interface for interacting with your store programmatically. You can read and write various parts of WooCommerce data including orders, products, coupons, customers, shipping zones, and more.
+
+## What is the REST API?
+
+The REST API allows you to:
+
+- Retrieve store data in JSON format
+- Create, update, and delete resources
+- Integrate WooCommerce with external applications
+- Build custom storefronts and mobile apps
+- Automate store management tasks
+
+## API Versions
+
+WooCommerce REST API is available in multiple versions:
+
+### Version 3 (Current)
+
+**Namespace**: `wc/v3`
+
+The current stable version with the latest features and improvements. This version includes:
+
+- Enhanced product management
+- Improved order handling
+- Customer data access
+- Reports and analytics endpoints
+- Batch operations support
+
+### Version 2 (Legacy)
+
+**Namespace**: `wc/v2`
+
+Previous stable version, still supported but not recommended for new integrations.
+
+### Version 1 (Deprecated)
+
+**Namespace**: `wc/v1`
+
+Deprecated version maintained for backwards compatibility only.
+
+<Note>
+Always use the latest API version (v3) for new integrations to access the most recent features and security updates.
+</Note>
+
+## Base URL Structure
+
+The REST API endpoints are accessed via the following URL pattern:
+
+```
+https://yourdomain.com/wp-json/wc/{version}/{endpoint}
+```
+
+### Examples
+
+```bash
+# Products endpoint
+https://example.com/wp-json/wc/v3/products
+
+# Orders endpoint
+https://example.com/wp-json/wc/v3/orders
+
+# Customers endpoint
+https://example.com/wp-json/wc/v3/customers
+```
+
+## Requirements
+
+### Permalinks Configuration
+
+To access REST API endpoints using the standard URI structure, WordPress permalinks must be configured to something other than "Plain".
+
+1. Navigate to **Settings > Permalinks** in WordPress admin
+2. Select any option except "Plain" (recommended: "Post name")
+3. Click **Save Changes**
+
+<Note>
+If you cannot change permalinks, you can use the alternative query string format:
+`https://example.com/?rest_route=/wc/v3/products`
+</Note>
+
+### HTTPS Recommended
+
+While the API can work over HTTP, **HTTPS is strongly recommended** for:
+
+- Secure transmission of API credentials
+- Protection of customer data
+- Prevention of man-in-the-middle attacks
+
+## Core Endpoints
+
+The WooCommerce REST API provides access to the following core resources:
+
+### Products
+
+- **Endpoint**: `/wc/v3/products`
+- **Operations**: List, create, retrieve, update, delete products
+- **Related**: Product variations, attributes, categories, tags
+
+### Orders
+
+- **Endpoint**: `/wc/v3/orders`
+- **Operations**: List, create, retrieve, update, delete orders
+- **Related**: Order notes, refunds, line items
+
+### Customers
+
+- **Endpoint**: `/wc/v3/customers`
+- **Operations**: List, create, retrieve, update, delete customers
+- **Related**: Customer orders, downloads
+
+### Coupons
+
+- **Endpoint**: `/wc/v3/coupons`
+- **Operations**: Manage discount coupons and promotional codes
+
+### Reports
+
+- **Endpoint**: `/wc/v3/reports`
+- **Operations**: Access sales reports, analytics, and statistics
+
+### Settings
+
+- **Endpoint**: `/wc/v3/settings`
+- **Operations**: Retrieve and update store settings
+
+### Shipping
+
+- **Endpoint**: `/wc/v3/shipping`
+- **Operations**: Manage shipping zones, methods, and classes
+
+### Taxes
+
+- **Endpoint**: `/wc/v3/taxes`
+- **Operations**: Manage tax rates and classes
+
+## HTTP Methods
+
+The API uses standard HTTP methods:
+
+| Method | Description | Example Use |
+|--------|-------------|-------------|
+| `GET` | Retrieve resources | Get list of products |
+| `POST` | Create new resources | Create a new order |
+| `PUT` | Update existing resources | Update product price |
+| `DELETE` | Remove resources | Delete a customer |
+| `OPTIONS` | Get endpoint information | Discover available fields |
+
+## Response Format
+
+All API responses are returned in JSON format:
+
+```json
+{
+  "id": 123,
+  "name": "Premium T-Shirt",
+  "price": "29.99",
+  "status": "publish"
+}
+```
+
+### Response Headers
+
+Important headers included in API responses:
+
+```
+Content-Type: application/json
+X-WP-Total: 100
+X-WP-TotalPages: 10
+Link: <https://example.com/wp-json/wc/v3/products?page=2>; rel="next"
+```
+
+## Pagination
+
+List endpoints support pagination with the following parameters:
+
+<ParamField query="page" type="integer" default="1">
+  Current page of results
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="10">
+  Number of items per page (maximum 100)
+</ParamField>
+
+### Example
+
+```bash
+curl https://example.com/wp-json/wc/v3/products?page=2&per_page=20 \
+  -u consumer_key:consumer_secret
+```
+
+## Filtering and Searching
+
+Most endpoints support filtering and searching:
+
+```bash
+# Search products by name
+GET /wc/v3/products?search=shirt
+
+# Filter orders by status
+GET /wc/v3/orders?status=completed
+
+# Filter by date range
+GET /wc/v3/orders?after=2024-01-01T00:00:00&before=2024-12-31T23:59:59
+```
+
+## Batch Operations
+
+Many endpoints support batch operations for creating, updating, and deleting multiple items in a single request:
+
+```bash
+POST /wc/v3/products/batch
+```
+
+```json
+{
+  "create": [
+    { "name": "Product 1", "price": "10.00" },
+    { "name": "Product 2", "price": "20.00" }
+  ],
+  "update": [
+    { "id": 123, "price": "15.00" }
+  ],
+  "delete": [456, 789]
+}
+```
+
+## Error Handling
+
+API errors return appropriate HTTP status codes with detailed error messages:
+
+### Common Status Codes
+
+| Code | Status | Description |
+|------|--------|-------------|
+| 200 | OK | Request successful |
+| 201 | Created | Resource created successfully |
+| 400 | Bad Request | Invalid request parameters |
+| 401 | Unauthorized | Authentication failed |
+| 403 | Forbidden | Insufficient permissions |
+| 404 | Not Found | Resource does not exist |
+| 500 | Internal Server Error | Server error occurred |
+
+### Error Response Format
+
+```json
+{
+  "code": "woocommerce_rest_invalid_product_id",
+  "message": "Invalid product ID.",
+  "data": {
+    "status": 404
+  }
+}
+```
+
+## Rate Limiting
+
+<Note>
+WooCommerce does not impose rate limits by default, but your hosting provider may have restrictions. Always implement retry logic with exponential backoff in your integrations.
+</Note>
+
+## Webhooks Integration
+
+While not part of the REST API itself, WooCommerce webhooks can notify your application of events:
+
+- Order created/updated
+- Product created/updated
+- Customer created/updated
+- And more
+
+Webhooks provide real-time updates without polling the API.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="lock" href="/api/rest-api/authentication">
+    Learn how to authenticate API requests
+  </Card>
+  <Card title="Products" icon="box" href="/api/rest-api/products">
+    Manage products via the API
+  </Card>
+  <Card title="Orders" icon="cart-shopping" href="/api/rest-api/orders">
+    Create and manage orders
+  </Card>
+  <Card title="Customers" icon="users" href="/api/rest-api/customers">
+    Work with customer data
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [Official REST API Documentation](https://woocommerce.github.io/woocommerce-rest-api-docs/)
+- [WordPress REST API Handbook](https://developer.wordpress.org/rest-api/)
+- [WooCommerce GitHub Repository](https://github.com/woocommerce/woocommerce)

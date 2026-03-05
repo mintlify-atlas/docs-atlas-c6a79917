@@ -1,0 +1,474 @@
+---
+title: REST API Authentication
+description: Authentication methods for the WooCommerce REST API including OAuth, API keys, JWT, and basic auth
+---
+
+# REST API Authentication
+
+The WooCommerce REST API requires authentication for all requests. This guide covers the available authentication methods and how to implement them.
+
+## Authentication Methods
+
+WooCommerce supports multiple authentication methods:
+
+1. **REST API Keys** (Recommended for most integrations)
+2. **OAuth 1.0a** (For third-party applications)
+3. **Basic Authentication** (HTTPS only, simple testing)
+4. **JWT** (JSON Web Tokens, with plugins)
+
+## REST API Keys
+
+The recommended authentication method for most integrations. API keys are generated through the WooCommerce admin interface.
+
+### Generating API Keys
+
+1. Navigate to **WooCommerce > Settings > Advanced**
+2. Click the **REST API** tab
+3. Click **Add key**
+4. Configure the key:
+   - **Description**: Name to identify the key (e.g., "Mobile App Integration")
+   - **User**: WordPress user with appropriate permissions
+   - **Permissions**: Read, Write, or Read/Write
+5. Click **Generate API Key**
+6. **Save your keys immediately** - the Consumer Secret is shown only once
+
+<Warning>
+Store your Consumer Key and Consumer Secret securely. The Consumer Secret cannot be retrieved after closing the page.
+</Warning>
+
+### Key Components
+
+After generation, you'll receive:
+
+- **Consumer Key**: Public identifier (e.g., `ck_1234567890abcdef`)
+- **Consumer Secret**: Private key (e.g., `cs_1234567890abcdef`)
+
+### Using API Keys with HTTPS
+
+When your site uses HTTPS, use HTTP Basic Authentication:
+
+<CodeGroup>
+```bash cURL
+curl https://example.com/wp-json/wc/v3/products \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+const axios = require('axios');
+
+const api = axios.create({
+  baseURL: 'https://example.com/wp-json/wc/v3',
+  auth: {
+    username: 'ck_1234567890abcdef',
+    password: 'cs_1234567890abcdef'
+  }
+});
+
+// Get all products
+api.get('/products')
+  .then(response => {
+    console.log(response.data);
+  })
+  .catch(error => {
+    console.error(error.response.data);
+  });
+```
+
+```python Python
+import requests
+from requests.auth import HTTPBasicAuth
+
+url = 'https://example.com/wp-json/wc/v3/products'
+auth = HTTPBasicAuth(
+    'ck_1234567890abcdef',
+    'cs_1234567890abcdef'
+)
+
+response = requests.get(url, auth=auth)
+products = response.json()
+print(products)
+```
+
+```php PHP
+<?php
+require_once 'vendor/autoload.php';
+
+use Automattic\WooCommerce\Client;
+
+$woocommerce = new Client(
+    'https://example.com',
+    'ck_1234567890abcdef',
+    'cs_1234567890abcdef',
+    [
+        'version' => 'wc/v3',
+    ]
+);
+
+$products = $woocommerce->get('products');
+print_r($products);
+?>
+```
+
+```ruby Ruby
+require 'woocommerce_api'
+
+woocommerce = WooCommerce::API.new(
+  "https://example.com",
+  "ck_1234567890abcdef",
+  "cs_1234567890abcdef",
+  {
+    version: "wc/v3"
+  }
+)
+
+products = woocommerce.get("products").parsed_response
+puts products
+```
+</CodeGroup>
+
+### Using API Keys with HTTP
+
+If your site only supports HTTP, pass credentials as query parameters:
+
+<Warning>
+HTTP is not secure. Credentials are transmitted in plain text and can be intercepted. Use HTTPS whenever possible.
+</Warning>
+
+```bash
+curl http://example.com/wp-json/wc/v3/products \
+  ?consumer_key=ck_1234567890abcdef \
+  &consumer_secret=cs_1234567890abcdef
+```
+
+## OAuth 1.0a Authentication
+
+OAuth 1.0a is designed for third-party applications that need to access customer stores without storing passwords.
+
+### When to Use OAuth
+
+- Building a SaaS application
+- Creating marketplace integrations
+- Allowing multiple stores to connect
+- Need to revoke access without changing passwords
+
+### OAuth Flow
+
+1. **Request Token**: Get temporary credentials
+2. **Authorization**: Redirect user to approve access
+3. **Access Token**: Exchange for permanent credentials
+4. **API Requests**: Use access token for authentication
+
+### Implementation Example
+
+<CodeGroup>
+```javascript JavaScript (Node.js)
+const OAuth = require('oauth-1.0a');
+const crypto = require('crypto');
+const axios = require('axios');
+
+const oauth = OAuth({
+  consumer: {
+    key: 'ck_1234567890abcdef',
+    secret: 'cs_1234567890abcdef'
+  },
+  signature_method: 'HMAC-SHA256',
+  hash_function(base_string, key) {
+    return crypto
+      .createHmac('sha256', key)
+      .update(base_string)
+      .digest('base64');
+  }
+});
+
+const request_data = {
+  url: 'https://example.com/wp-json/wc/v3/products',
+  method: 'GET'
+};
+
+const headers = oauth.toHeader(oauth.authorize(request_data));
+
+axios.get(request_data.url, { headers })
+  .then(response => console.log(response.data))
+  .catch(error => console.error(error));
+```
+
+```python Python
+from requests_oauthlib import OAuth1Session
+
+consumer_key = 'ck_1234567890abcdef'
+consumer_secret = 'cs_1234567890abcdef'
+
+url = 'https://example.com/wp-json/wc/v3/products'
+
+oauth = OAuth1Session(
+    consumer_key,
+    client_secret=consumer_secret,
+    signature_method='HMAC-SHA256'
+)
+
+response = oauth.get(url)
+products = response.json()
+print(products)
+```
+</CodeGroup>
+
+### OAuth Parameters
+
+OAuth requests include these parameters:
+
+- `oauth_consumer_key`: Your consumer key
+- `oauth_timestamp`: Current Unix timestamp
+- `oauth_nonce`: Unique random string
+- `oauth_signature`: Request signature
+- `oauth_signature_method`: Usually HMAC-SHA256
+
+## Basic Authentication Plugin
+
+For development and testing, you can use the Basic Authentication plugin.
+
+<Warning>
+Basic Authentication should ONLY be used for development/testing with HTTPS. Never use in production.
+</Warning>
+
+### Installation
+
+1. Download [WooCommerce Basic Auth plugin](https://github.com/WooCommerce/WooCommerce/tree/trunk/plugins/woocommerce/includes/rest-api)
+2. Install and activate the plugin
+3. Use WordPress username and password for authentication
+
+### Example Request
+
+```bash
+curl https://example.com/wp-json/wc/v3/products \
+  -u username:password
+```
+
+## JWT Authentication
+
+JSON Web Tokens provide stateless authentication with enhanced security.
+
+### Setup
+
+1. Install a JWT authentication plugin:
+   - [JWT Authentication for WP REST API](https://wordpress.org/plugins/jwt-authentication-for-wp-rest-api/)
+   - [Simple JWT Authentication](https://wordpress.org/plugins/simple-jwt-authentication/)
+
+2. Configure your `.htaccess` or server to pass Authorization headers
+
+### Obtaining a Token
+
+```bash
+curl -X POST https://example.com/wp-json/jwt-auth/v1/token \
+  -d "username=your_username" \
+  -d "password=your_password"
+```
+
+**Response:**
+
+```json
+{
+  "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "user_email": "user@example.com",
+  "user_nicename": "username",
+  "user_display_name": "User Name"
+}
+```
+
+### Using the Token
+
+```bash
+curl https://example.com/wp-json/wc/v3/products \
+  -H "Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+```
+
+## Testing Authentication
+
+### Using Postman
+
+1. Create a new request
+2. Set URL: `https://example.com/wp-json/wc/v3/products`
+3. Go to **Authorization** tab
+4. Select **Basic Auth**
+5. Enter Consumer Key as username
+6. Enter Consumer Secret as password
+7. Send request
+
+### Using Insomnia
+
+1. Create a new request
+2. Set URL: `https://example.com/wp-json/wc/v3/products`
+3. Go to **Auth** tab
+4. Select **Basic Auth**
+5. Enter Consumer Key and Consumer Secret
+6. Send request
+
+## Common Authentication Errors
+
+### 401 Unauthorized
+
+**Cause**: Invalid credentials or signature
+
+**Solutions**:
+- Verify Consumer Key and Consumer Secret are correct
+- Check that the user has appropriate permissions
+- Ensure credentials haven't been revoked
+- Generate new API keys
+
+### Consumer Key is Missing
+
+**Cause**: Server not parsing Authorization header correctly
+
+**Solution**: Pass credentials as query parameters:
+
+```bash
+https://example.com/wp-json/wc/v3/orders?consumer_key=ck_xxx&consumer_secret=cs_xxx
+```
+
+### 403 Forbidden
+
+**Cause**: User lacks required permissions
+
+**Solution**:
+- Ensure the user has `edit_posts` capability
+- Check API key permissions (Read/Write)
+- Verify user role has appropriate capabilities
+
+### SSL Certificate Errors
+
+**Cause**: Self-signed or invalid SSL certificate
+
+**Solution for Testing Only**:
+- Disable SSL verification (Postman/Insomnia settings)
+- Use proper SSL certificate in production
+
+## Security Best Practices
+
+<Note>
+Follow these security guidelines to protect your store and customer data.
+</Note>
+
+### 1. Always Use HTTPS
+
+```bash
+# Good
+https://example.com/wp-json/wc/v3/products
+
+# Bad - credentials transmitted in plain text
+http://example.com/wp-json/wc/v3/products
+```
+
+### 2. Limit Key Permissions
+
+- Use **Read** permission for data retrieval only
+- Use **Write** permission only when necessary
+- Create separate keys for different integrations
+
+### 3. Rotate Keys Regularly
+
+- Generate new keys periodically
+- Revoke old keys after migration
+- Monitor key usage in WooCommerce logs
+
+### 4. Store Credentials Securely
+
+```javascript
+// Good - Use environment variables
+const API_KEY = process.env.WC_CONSUMER_KEY;
+const API_SECRET = process.env.WC_CONSUMER_SECRET;
+
+// Bad - Hardcoded credentials
+const API_KEY = 'ck_1234567890abcdef';
+```
+
+### 5. Implement Rate Limiting
+
+```javascript
+// Example: Rate limiting with retry logic
+const makeRequest = async (url, retries = 3) => {
+  try {
+    return await api.get(url);
+  } catch (error) {
+    if (error.response?.status === 429 && retries > 0) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return makeRequest(url, retries - 1);
+    }
+    throw error;
+  }
+};
+```
+
+### 6. Validate SSL Certificates
+
+```python
+# Good - Verify SSL certificates
+import requests
+response = requests.get(url, auth=auth, verify=True)
+
+# Bad - Disabling SSL verification
+response = requests.get(url, auth=auth, verify=False)
+```
+
+## Authentication with FastCGI
+
+If your server uses FastCGI, authorization headers may not be passed correctly.
+
+### Solution 1: Modify .htaccess
+
+Add to your `.htaccess` file:
+
+```apache
+RewriteEngine On
+RewriteCond %{HTTP:Authorization} ^(.*)
+RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+```
+
+### Solution 2: Use Query Parameters
+
+Pass credentials in the URL:
+
+```bash
+https://example.com/wp-json/wc/v3/products?consumer_key=ck_xxx&consumer_secret=cs_xxx
+```
+
+## Webhook Authentication
+
+When WooCommerce sends webhook requests to your application, it includes a signature for verification.
+
+### Verifying Webhook Signatures
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhook(payload, signature, secret) {
+  const hash = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('base64');
+  
+  return hash === signature;
+}
+
+// Express.js middleware
+app.post('/woocommerce-webhook', (req, res) => {
+  const signature = req.headers['x-wc-webhook-signature'];
+  const payload = JSON.stringify(req.body);
+  
+  if (!verifyWebhook(payload, signature, webhookSecret)) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  // Process webhook
+  res.sendStatus(200);
+});
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Products API" icon="box" href="/api/rest-api/products">
+    Learn how to manage products
+  </Card>
+  <Card title="Orders API" icon="cart-shopping" href="/api/rest-api/orders">
+    Create and update orders
+  </Card>
+</CardGroup>

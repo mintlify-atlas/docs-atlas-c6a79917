@@ -1,0 +1,682 @@
+---
+title: Block Theme Development
+description: Comprehensive guide to WooCommerce block theme development with Full Site Editing, block templates, and theme.json styling
+---
+
+# Block Theme Development
+
+Block themes leverage WordPress Full Site Editing (FSE) to provide visual, no-code customization experiences. WooCommerce fully supports block themes with specialized templates, blocks, and global styling through `theme.json`.
+
+<Note>
+This guide covers block themes using HTML templates and FSE. For classic PHP-based theme development, see [Classic Theme Development](/themes/classic-themes).
+</Note>
+
+<Info>
+New to block theme development? Complete the [WordPress Block Theme Development Course](https://learn.wordpress.org/course/develop-your-first-low-code-block-theme/) before diving into WooCommerce-specific concepts.
+</Info>
+
+## Block Theme Fundamentals
+
+Block themes use HTML files instead of PHP templates and are styled through `theme.json` rather than traditional CSS. This architecture enables:
+
+- **Visual editing** - Users customize templates in the Site Editor
+- **Global styles** - Consistent styling via `theme.json` configuration
+- **Better performance** - Only required CSS loads on each page
+- **User control** - Non-developers can modify layouts without code
+
+### Prerequisites
+
+Before developing WooCommerce block themes, ensure you understand:
+
+- WordPress block editor (Gutenberg)
+- Block templates and template parts
+- `theme.json` configuration
+- Global styles and settings
+- Site Editor interface
+
+## WooCommerce Block Templates
+
+WooCommerce provides default block templates for product and shop pages. These templates are located in:
+
+```
+wp-content/plugins/woocommerce/templates/templates/blockified/
+```
+
+### Available Templates
+
+<Tabs>
+  <Tab title="Product Templates">
+    - **`single-product.html`** - Single product page layout
+    - **`archive-product.html`** - Main shop/product catalog
+    - **`product-search-results.html`** - Product search results
+  </Tab>
+  
+  <Tab title="Taxonomy Templates">
+    - **`taxonomy-product_cat.html`** - Products by category
+    - **`taxonomy-product_tag.html`** - Products by tag  
+    - **`taxonomy-product_attribute.html`** - Products by attribute
+  </Tab>
+  
+  <Tab title="Page Templates">
+    - **`page-cart.html`** - Shopping cart page
+    - **`page-checkout.html`** - Checkout page
+    - **`page-coming-soon.html`** - Coming soon page
+    - **`order-confirmation.html`** - Order confirmation
+  </Tab>
+</Tabs>
+
+### Template Hierarchy
+
+WooCommerce block templates follow WordPress template hierarchy with specific fallback patterns:
+
+```
+Single Product:
+single-product-{slug}.html  →  single-product.html  →  single.html
+
+Category Archive:
+taxonomy-product_cat-{slug}.html  →  taxonomy-product_cat.html  →  archive-product.html
+
+Tag Archive:
+taxonomy-product_tag-{slug}.html  →  taxonomy-product_tag.html  →  archive-product.html
+
+Attribute Archive:
+taxonomy-product_attribute-{slug}.html  →  taxonomy-product_attribute.html  →  archive-product.html
+```
+
+<Info>
+Category, tag, and attribute templates **fall back to** `archive-product.html` if specific taxonomy templates aren't provided.
+</Info>
+
+## Overriding Block Templates
+
+Create custom templates by adding HTML files to your theme's `/templates/` directory:
+
+<Steps>
+  <Step title="Create Templates Directory">
+    Ensure your theme has a `templates/` folder:
+    
+    ```
+    wp-content/themes/yourtheme/templates/
+    ```
+  </Step>
+  
+  <Step title="Copy WooCommerce Template">
+    Copy the template you want to customize from WooCommerce to your theme:
+    
+    ```
+    FROM: wp-content/plugins/woocommerce/templates/templates/blockified/single-product.html
+    TO:   wp-content/themes/yourtheme/templates/single-product.html
+    ```
+  </Step>
+  
+  <Step title="Edit in Site Editor">
+    Customize the template using the WordPress Site Editor:
+    
+    **Appearance → Editor → Templates → Single Product**
+  </Step>
+  
+  <Step title="Export Changes (Optional)">
+    Export modified templates to commit them to your theme repository.
+  </Step>
+</Steps>
+
+### Example: Custom Single Product Template
+
+```html
+<!-- wp:template-part {"slug":"header","theme":"yourtheme","tagName":"header"} /-->
+
+<!-- wp:group {"layout":{"type":"constrained"}} -->
+<div class="wp-block-group">
+    
+    <!-- wp:woocommerce/breadcrumbs /-->
+    
+    <!-- wp:woocommerce/store-notices /-->
+    
+    <!-- wp:columns -->
+    <div class="wp-block-columns">
+        
+        <!-- wp:column {"width":"50%"} -->
+        <div class="wp-block-column" style="flex-basis:50%">
+            <!-- wp:woocommerce/product-image-gallery /-->
+        </div>
+        <!-- /wp:column -->
+        
+        <!-- wp:column {"width":"50%"} -->
+        <div class="wp-block-column" style="flex-basis:50%">
+            
+            <!-- wp:post-title {"level":1} /-->
+            
+            <!-- wp:woocommerce/product-rating /-->
+            
+            <!-- wp:woocommerce/product-price {"fontSize":"large"} /-->
+            
+            <!-- wp:post-excerpt /-->
+            
+            <!-- wp:woocommerce/add-to-cart-form /-->
+            
+            <!-- wp:woocommerce/product-meta /-->
+            
+        </div>
+        <!-- /wp:column -->
+        
+    </div>
+    <!-- /wp:columns -->
+    
+    <!-- wp:woocommerce/product-details /-->
+    
+    <!-- wp:woocommerce/related-products /-->
+    
+</div>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","theme":"yourtheme","tagName":"footer"} /-->
+```
+
+### Specific Product Templates
+
+Create templates for specific products using their slug:
+
+```html
+<!-- single-product-leather-jacket.html -->
+<!-- Only applies to product with slug "leather-jacket" -->
+
+<!-- wp:template-part {"slug":"header"} /-->
+
+<div class="luxury-product-layout">
+    <!-- Custom layout for premium products -->
+    <!-- wp:woocommerce/product-image-gallery {"thumbnailsPosition":"left"} /-->
+    <!-- wp:woocommerce/product-price {"fontSize":"x-large"} /-->
+</div>
+
+<!-- wp:template-part {"slug":"footer"} /-->
+```
+
+## Block Template Parts
+
+WooCommerce provides specialized template parts for reusable components:
+
+### Available Template Parts
+
+- **`mini-cart.html`** - Used inside the Mini-Cart block drawer
+- **`checkout-header.html`** - Header used in checkout template
+
+Override template parts in your theme's `/parts/` directory:
+
+```
+wp-content/themes/yourtheme/parts/
+├── mini-cart.html
+└── checkout-header.html
+```
+
+### Example: Custom Mini-Cart Template Part
+
+```html
+<!-- parts/mini-cart.html -->
+
+<!-- wp:woocommerce/filled-mini-cart-contents-block -->
+<div class="wp-block-woocommerce-filled-mini-cart-contents-block">
+    
+    <!-- wp:woocommerce/mini-cart-title-block /-->
+    
+    <!-- wp:woocommerce/mini-cart-items-block /-->
+    
+    <!-- wp:woocommerce/mini-cart-footer-block -->
+    <div class="wp-block-woocommerce-mini-cart-footer-block">
+        
+        <!-- wp:woocommerce/mini-cart-cart-button-block /-->
+        
+        <!-- wp:woocommerce/mini-cart-checkout-button-block /-->
+        
+        <!-- Custom message -->
+        <!-- wp:paragraph {"fontSize":"small"} -->
+        <p class="has-small-font-size">Free shipping on orders over $50!</p>
+        <!-- /wp:paragraph -->
+        
+    </div>
+    <!-- /wp:woocommerce/mini-cart-footer-block -->
+    
+</div>
+<!-- /wp:woocommerce/filled-mini-cart-contents-block -->
+
+<!-- wp:woocommerce/empty-mini-cart-contents-block -->
+<div class="wp-block-woocommerce-empty-mini-cart-contents-block">
+    <!-- wp:paragraph -->
+    <p>Your cart is empty</p>
+    <!-- /wp:paragraph -->
+</div>
+<!-- /wp:woocommerce/empty-mini-cart-contents-block -->
+```
+
+## Styling with theme.json
+
+Global styles in `theme.json` provide the primary styling mechanism for block themes. WooCommerce blocks support all standard theme.json style properties.
+
+### Basic WooCommerce Block Styling
+
+```json
+{
+  "version": 2,
+  "styles": {
+    "blocks": {
+      "woocommerce/product-price": {
+        "color": {
+          "background": "#f0f0f0",
+          "text": "#333333"
+        },
+        "typography": {
+          "fontSize": "1.5rem",
+          "fontWeight": "700",
+          "fontStyle": "normal"
+        },
+        "spacing": {
+          "padding": {
+            "top": "0.5rem",
+            "bottom": "0.5rem"
+          }
+        }
+      },
+      "woocommerce/product-button": {
+        "color": {
+          "background": "#2c3e50",
+          "text": "#ffffff"
+        },
+        "border": {
+          "radius": "4px"
+        },
+        "spacing": {
+          "padding": "1rem 2rem"
+        }
+      },
+      "woocommerce/product-image": {
+        "border": {
+          "radius": "8px"
+        }
+      }
+    }
+  }
+}
+```
+
+### Complete WooCommerce Styling Example
+
+<CodeGroup>
+
+```json Product Blocks
+{
+  "styles": {
+    "blocks": {
+      "woocommerce/product-price": {
+        "color": {
+          "text": "#e63946"
+        },
+        "typography": {
+          "fontSize": "1.75rem",
+          "fontWeight": "700",
+          "lineHeight": "1.2"
+        }
+      },
+      "woocommerce/product-rating": {
+        "color": {
+          "text": "#f4a261"
+        },
+        "spacing": {
+          "margin": {
+            "bottom": "1rem"
+          }
+        }
+      },
+      "woocommerce/add-to-cart-form": {
+        "spacing": {
+          "margin": {
+            "top": "2rem",
+            "bottom": "2rem"
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+```json Cart & Checkout
+{
+  "styles": {
+    "blocks": {
+      "woocommerce/cart": {
+        "spacing": {
+          "padding": "2rem"
+        }
+      },
+      "woocommerce/checkout": {
+        "color": {
+          "background": "#ffffff"
+        },
+        "spacing": {
+          "padding": "2rem"
+        }
+      },
+      "woocommerce/checkout-fields-block": {
+        "spacing": {
+          "blockGap": "1.5rem"
+        }
+      }
+    }
+  }
+}
+```
+
+```json Product Collection
+{
+  "styles": {
+    "blocks": {
+      "woocommerce/product-collection": {
+        "spacing": {
+          "blockGap": "2rem"
+        }
+      },
+      "woocommerce/product-template": {
+        "border": {
+          "radius": "8px",
+          "width": "1px",
+          "color": "#e0e0e0",
+          "style": "solid"
+        },
+        "spacing": {
+          "padding": "1.5rem"
+        }
+      }
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+### Advantages of theme.json Styling
+
+<CardGroup cols={2}>
+  <Card title="Performance" icon="gauge-high">
+    Only necessary CSS loads per page, reducing bundle size and improving load times
+  </Card>
+  
+  <Card title="User Customization" icon="sliders">
+    Users can modify styles through the Site Editor without touching code
+  </Card>
+  
+  <Card title="Conflict Management" icon="shield-check">
+    Gracefully handles conflicts between plugins and themes
+  </Card>
+  
+  <Card title="Markup Independence" icon="unlock">
+    Styles persist even when block markup or class names change
+  </Card>
+</CardGroup>
+
+<Warning>
+Avoid writing CSS that depends on specific block nesting or HTML structure. Users can freely rearrange blocks, breaking CSS selectors that rely on hierarchy.
+</Warning>
+
+## WooCommerce Block Reference
+
+Common WooCommerce blocks available in block templates:
+
+### Product Display Blocks
+
+| Block | Purpose |
+|-------|---------|
+| `woocommerce/product-image-gallery` | Product images with thumbnails |
+| `woocommerce/product-price` | Product price display |
+| `woocommerce/product-rating` | Star rating display |
+| `woocommerce/product-meta` | SKU, categories, tags |
+| `woocommerce/add-to-cart-form` | Add to cart functionality |
+| `woocommerce/product-details` | Product tabs (description, reviews) |
+| `woocommerce/breadcrumbs` | Breadcrumb navigation |
+
+### Product Collection Blocks
+
+| Block | Purpose |
+|-------|---------|
+| `woocommerce/product-collection` | Query and display products |
+| `woocommerce/product-template` | Layout for individual products |
+| `woocommerce/related-products` | Related products display |
+| `woocommerce/handpicked-products` | Manually selected products |
+
+### Cart & Checkout Blocks
+
+| Block | Purpose |
+|-------|---------|
+| `woocommerce/cart` | Complete cart block |
+| `woocommerce/checkout` | Complete checkout block |
+| `woocommerce/mini-cart` | Mini cart drawer |
+| `woocommerce/cart-items-block` | Cart line items |
+| `woocommerce/checkout-fields-block` | Checkout form fields |
+
+### Utility Blocks
+
+| Block | Purpose |
+|-------|---------|
+| `woocommerce/store-notices` | Display WooCommerce notices |
+| `woocommerce/customer-account` | Account link/menu |
+| `woocommerce/catalog-sorting` | Product sorting options |
+| `woocommerce/product-results-count` | Result count display |
+
+<Info>
+For the complete block reference including all attributes and settings, see the [WooCommerce Block Reference](/block-development/reference/block-references).
+</Info>
+
+## CSS Styling (When Necessary)
+
+While `theme.json` is preferred, some styling requires custom CSS. When writing CSS for block themes:
+
+<Warning>
+WooCommerce strongly discourages CSS selectors that rely on specific block nesting. Users can rearrange blocks freely, breaking hierarchy-dependent selectors.
+</Warning>
+
+### CSS Best Practices
+
+```css
+/* ✓ GOOD - Targets block directly */
+.wp-block-woocommerce-product-price {
+    font-size: 1.5rem;
+    color: #e63946;
+}
+
+/* ✓ GOOD - Uses component classes */
+.wc-block-components-product-price {
+    font-weight: 700;
+}
+
+/* ✗ AVOID - Relies on nesting */
+.wp-block-woocommerce-product-collection 
+  .wp-block-woocommerce-product-price {
+    color: red; /* Breaks if user moves price block */
+}
+
+/* ✗ AVOID - Depends on structure */
+.wc-block-checkout .wc-block-components-totals-item:first-child {
+    /* Breaks if user reorders blocks */
+}
+```
+
+### Block and Component Class Names
+
+WooCommerce uses BEM naming with two prefixes:
+
+- **`.wc-block-`** - Block-specific classes
+- **`.wc-block-components-`** - Reusable component classes
+
+Target components globally or within specific blocks:
+
+```css
+/* Style all prices globally */
+.wc-block-components-formatted-money-amount {
+    font-style: italic;
+}
+
+/* Style prices only in checkout */
+.wc-block-checkout .wc-block-components-formatted-money-amount {
+    font-style: italic;
+}
+```
+
+### Container Queries for Cart/Checkout
+
+Cart and Checkout blocks define CSS containers for responsive styling:
+
+```css
+.wp-block-woocommerce-checkout {
+    container-type: inline-size;
+}
+
+/* Use container queries instead of media queries */
+@container (min-width: 700px) {
+    .wc-block-checkout__sidebar {
+        padding: 2rem;
+    }
+}
+
+@container (max-width: 520px) {
+    .wc-block-checkout__form {
+        padding: 1rem;
+    }
+}
+```
+
+<Info>
+Container queries allow responsive design based on parent container width, not viewport width. This provides better adaptability in varied layouts.
+</Info>
+
+## User Customization Considerations
+
+Block themes empower users to customize templates through the Site Editor. Design themes with this in mind:
+
+<Steps>
+  <Step title="Provide Sensible Defaults">
+    Set up well-structured default templates that work out-of-the-box but remain customizable.
+  </Step>
+  
+  <Step title="Use Global Styles Extensively">
+    Define comprehensive `theme.json` styles so users can modify appearance without CSS.
+  </Step>
+  
+  <Step title="Document Customization Options">
+    Provide theme documentation explaining which blocks and styles users can safely modify.
+  </Step>
+  
+  <Step title="Test User Modifications">
+    Test templates with various block arrangements to ensure CSS doesn't break with user changes.
+  </Step>
+</Steps>
+
+<Note>
+Users can modify templates via the Site Editor. Always keep in mind that blocks may be moved, removed, or added in unexpected ways.
+</Note>
+
+## Migration from Classic Themes
+
+Converting classic themes to block themes requires restructuring templates and styles:
+
+<Tabs>
+  <Tab title="Template Conversion">
+    Convert PHP templates to HTML block templates:
+    
+    **Classic (PHP):**
+    ```php
+    <?php get_header(); ?>
+    <div class="container">
+        <?php woocommerce_content(); ?>
+    </div>
+    <?php get_footer(); ?>
+    ```
+    
+    **Block (HTML):**
+    ```html
+    <!-- wp:template-part {"slug":"header"} /-->
+    <!-- wp:group {"layout":{"type":"constrained"}} -->
+    <div class="wp-block-group">
+        <!-- WooCommerce blocks here -->
+    </div>
+    <!-- /wp:group -->
+    <!-- wp:template-part {"slug":"footer"} /-->
+    ```
+  </Tab>
+  
+  <Tab title="Style Migration">
+    Move CSS to `theme.json` where possible:
+    
+    **Classic (CSS):**
+    ```css
+    .woocommerce .product-price {
+        font-size: 1.5rem;
+        color: #e63946;
+    }
+    ```
+    
+    **Block (theme.json):**
+    ```json
+    {
+      "styles": {
+        "blocks": {
+          "woocommerce/product-price": {
+            "typography": {"fontSize": "1.5rem"},
+            "color": {"text": "#e63946"}
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Hook Alternatives">
+    Replace PHP hooks with block patterns or template customization:
+    
+    **Classic (Hook):**
+    ```php
+    add_action('woocommerce_single_product_summary', 'custom_badge', 6);
+    ```
+    
+    **Block (Template):**
+    ```html
+    <!-- Add directly in template -->
+    <!-- wp:paragraph {"className":"custom-badge"} -->
+    <p class="custom-badge">Featured!</p>
+    <!-- /wp:paragraph -->
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Prioritize theme.json" icon="file-code">
+    Use global styles for all styling that doesn't require complex selectors
+  </Card>
+  
+  <Card title="Avoid Structure Dependency" icon="diagram-project">
+    Never write CSS that assumes specific block nesting or order
+  </Card>
+  
+  <Card title="Test with Variations" icon="flask">
+    Test templates with blocks added, removed, and rearranged by users
+  </Card>
+  
+  <Card title="Document User Options" icon="book">
+    Clearly explain which customizations users can make safely
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Block Reference" icon="cube" href="/block-development/reference/block-references">
+    Complete reference for all WooCommerce blocks
+  </Card>
+  
+  <Card title="Theme Customization" icon="palette" href="/themes/customization">
+    Advanced styling and customization techniques
+  </Card>
+  
+  <Card title="Create Block Theme Plugin" icon="tools" href="https://wordpress.org/plugins/create-block-theme/">
+    Tool for creating and exporting block themes
+  </Card>
+</CardGroup>

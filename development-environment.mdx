@@ -1,0 +1,387 @@
+---
+title: "Development Environment Setup"
+description: "Set up your local development environment for WooCommerce development."
+---
+
+## Overview
+
+This guide will help you set up a complete development environment for working with the WooCommerce monorepo. Whether you're building extensions, themes, or contributing to core, you'll need these tools installed.
+
+## Prerequisites
+
+### Operating System
+
+<Info>
+A POSIX-compliant operating system (Linux or macOS) is recommended. Windows users should use [WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/install) available since Windows 10.
+</Info>
+
+### Required Tools
+
+<Steps>
+  <Step title="Node Version Manager (NVM)">
+    NVM ensures you're using the correct Node.js version for WooCommerce development.
+    
+    **Installation:**
+    
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+    ```
+    
+    **Verify installation:**
+    
+    ```bash
+    nvm --version
+    ```
+    
+    <Note>
+    The WooCommerce repository contains an `.nvmrc` file that specifies the required Node.js version.
+    </Note>
+  </Step>
+  
+  <Step title="PNPM Package Manager">
+    PNPM is used to manage dependencies and run scripts in the monorepo.
+    
+    **Installation:**
+    
+    <CodeGroup>
+    ```bash npm
+    npm install -g pnpm
+    ```
+    
+    ```bash standalone
+    curl -fsSL https://get.pnpm.io/install.sh | sh -
+    ```
+    </CodeGroup>
+    
+    **Verify installation:**
+    
+    ```bash
+    pnpm --version
+    # Should show 9.15.0 or higher
+    ```
+  </Step>
+  
+  <Step title="PHP 7.4 or Higher">
+    WooCommerce requires PHP 7.4+ for development and runtime.
+    
+    **Check existing PHP:**
+    
+    ```bash
+    php --version
+    ```
+    
+    **Installation (Ubuntu/Debian):**
+    
+    ```bash
+    sudo apt update
+    sudo apt install php php-bcmath php-curl php-imagick \
+                     php-intl php-json php-mbstring \
+                     php-mysql php-xml php-zip
+    ```
+    
+    **Installation (macOS with Homebrew):**
+    
+    ```bash
+    brew install php@8.1
+    ```
+    
+    <Warning>
+    Make sure you install the required PHP extensions: bcmath, curl, imagick, intl, json, mbstring, mysql, xml, and zip.
+    </Warning>
+  </Step>
+  
+  <Step title="Composer Dependency Manager">
+    Composer manages PHP dependencies for WooCommerce and its packages.
+    
+    **Installation:**
+    
+    ```bash
+    curl -sS https://getcomposer.org/installer | php
+    sudo mv composer.phar /usr/local/bin/composer
+    ```
+    
+    **Verify installation:**
+    
+    ```bash
+    composer --version
+    ```
+  </Step>
+</Steps>
+
+## Clone the Repository
+
+Once all prerequisites are installed, clone the WooCommerce monorepo:
+
+```bash
+git clone https://github.com/woocommerce/woocommerce.git
+cd woocommerce
+```
+
+## Install Dependencies
+
+<Steps>
+  <Step title="Set Node.js version">
+    Use the version specified in `.nvmrc`:
+    
+    ```bash
+    nvm install
+    ```
+    
+    This will install and activate the correct Node.js version.
+  </Step>
+  
+  <Step title="Install all dependencies">
+    Install PHP and JavaScript dependencies for all packages:
+    
+    ```bash
+    pnpm install
+    ```
+    
+    <Info>
+    This command installs dependencies for all plugins, packages, and tools in the monorepo. It may take a few minutes.
+    </Info>
+  </Step>
+  
+  <Step title="Build all packages">
+    Build all plugins, packages, and tools:
+    
+    ```bash
+    pnpm build
+    ```
+    
+    This compiles TypeScript, bundles JavaScript, and prepares all packages for development.
+  </Step>
+</Steps>
+
+## WordPress Development Environment
+
+For plugin development and testing, you'll need a WordPress installation. WooCommerce uses `@wordpress/env` for local WordPress environments.
+
+### Setting Up wp-env
+
+<Steps>
+  <Step title="Navigate to the plugin directory">
+    ```bash
+    cd plugins/woocommerce
+    ```
+  </Step>
+  
+  <Step title="Start the environment">
+    ```bash
+    pnpm -- wp-env start
+    ```
+    
+    This creates a Docker-based WordPress environment with WooCommerce installed.
+    
+    <Note>
+    First start may take several minutes as Docker images are downloaded.
+    </Note>
+  </Step>
+  
+  <Step title="Access your development site">
+    After starting, your site will be available at:
+    
+    - **Site URL**: http://localhost:8888
+    - **Admin URL**: http://localhost:8888/wp-admin
+    - **Username**: admin
+    - **Password**: password
+  </Step>
+</Steps>
+
+### wp-env Commands
+
+```bash
+# Start the environment
+pnpm -- wp-env start
+
+# Stop the environment
+pnpm -- wp-env stop
+
+# Destroy the environment (removes all data)
+pnpm -- wp-env destroy
+
+# Clean the environment (reset database)
+pnpm -- wp-env clean
+
+# Run WP-CLI commands
+pnpm -- wp-env run cli wp plugin list
+```
+
+<Warning>
+**Docker Required**: wp-env requires Docker Desktop (or Docker Engine + Docker Compose). Install from [docker.com](https://www.docker.com/products/docker-desktop).
+</Warning>
+
+## IDE Setup
+
+### Recommended IDEs
+
+- **Visual Studio Code**: Popular, with excellent PHP and JavaScript support
+- **PHPStorm**: Professional PHP IDE with deep WordPress integration
+- **Cursor**: AI-powered editor based on VS Code
+
+### VS Code Extensions
+
+Recommended extensions for WooCommerce development:
+
+```json
+{
+  "recommendations": [
+    "bmewburn.vscode-intelephense-client",  // PHP IntelliSense
+    "dbaeumer.vscode-eslint",               // ESLint
+    "esbenp.prettier-vscode",               // Prettier
+    "bradlc.vscode-tailwindcss",            // Tailwind CSS
+    "ms-azuretools.vscode-docker"           // Docker support
+  ]
+}
+```
+
+### EditorConfig
+
+The repository includes an `.editorconfig` file that enforces consistent coding styles:
+
+```ini
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = tab
+indent_size = 4
+```
+
+## Environment Verification
+
+Verify your setup is complete:
+
+<Accordion title="Verification Checklist">
+  ```bash
+  # Check Node.js version
+  node --version
+  # Should match version in .nvmrc (^20.11.1)
+  
+  # Check PNPM
+  pnpm --version
+  # Should be 9.15.0 or higher
+  
+  # Check PHP
+  php --version
+  # Should be 7.4 or higher
+  
+  # Check Composer
+  composer --version
+  
+  # Check Docker (if using wp-env)
+  docker --version
+  docker-compose --version
+  
+  # Verify build completed
+  ls plugins/woocommerce/build
+  # Should show compiled assets
+  ```
+</Accordion>
+
+## Troubleshooting
+
+### PHP Extensions Missing
+
+If you see errors about missing PHP extensions:
+
+<Tabs>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    sudo apt install php-bcmath php-curl php-imagick \
+                     php-intl php-json php-mbstring \
+                     php-mysql php-xml php-zip
+    ```
+  </Tab>
+  
+  <Tab title="macOS">
+    ```bash
+    pecl install imagick
+    brew install php@8.1
+    ```
+  </Tab>
+</Tabs>
+
+### PNPM Install Fails
+
+If `pnpm install` fails:
+
+```bash
+# Clear PNPM cache
+pnpm store prune
+
+# Try installing again
+pnpm install
+```
+
+### Docker Issues with wp-env
+
+If wp-env won't start:
+
+```bash
+# Check Docker is running
+docker ps
+
+# Stop conflicting containers
+docker stop $(docker ps -aq)
+
+# Try starting again
+pnpm -- wp-env start
+```
+
+### Port Conflicts
+
+If port 8888 is already in use:
+
+```bash
+# Find what's using the port
+lsof -i :8888
+
+# Or configure wp-env to use different ports
+# Edit .wp-env.json in plugins/woocommerce/
+```
+
+## Next Steps
+
+With your environment set up, you're ready to start developing:
+
+<CardGroup cols={2}>
+  <Card
+    title="Project Structure"
+    icon="folder-tree"
+    href="/project-structure"
+  >
+    Learn about the monorepo organization
+  </Card>
+  <Card
+    title="Extension Development"
+    icon="puzzle-piece"
+    href="/extensions/getting-started"
+  >
+    Start building extensions
+  </Card>
+  <Card
+    title="Contributing"
+    icon="code-branch"
+    href="/contributing/overview"
+  >
+    Contribute to WooCommerce core
+  </Card>
+  <Card
+    title="Testing"
+    icon="flask"
+    href="/contributing/testing"
+  >
+    Learn about testing requirements
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [PNPM Workspace Documentation](https://pnpm.io/workspaces)
+- [WordPress wp-env Documentation](https://developer.wordpress.org/block-editor/reference-guides/packages/packages-env/)
+- [Docker Documentation](https://docs.docker.com/get-started/)
+- [WooCommerce Development Blog](https://developer.woocommerce.com/blog/)

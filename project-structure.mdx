@@ -1,0 +1,384 @@
+---
+title: "Project Structure"
+description: "Understanding the WooCommerce monorepo structure and organization."
+---
+
+## Overview
+
+WooCommerce uses a **monorepo** structure, meaning multiple related packages, plugins, and tools are maintained in a single repository. This approach enables code sharing, consistent versioning, and streamlined development workflows.
+
+```
+woocommerce/
+├── plugins/                 # WordPress plugins
+├── packages/                # Shared packages
+│   ├── js/              # JavaScript packages
+│   └── php/             # PHP packages
+├── tools/                   # Development tools
+├── docs/                    # Documentation
+├── pnpm-workspace.yaml      # Workspace configuration
+├── package.json             # Root package file
+└── tsconfig.base.json       # Base TypeScript config
+```
+
+## Top-Level Structure
+
+### plugins/
+
+Contains WordPress plugins related to WooCommerce:
+
+- **woocommerce/** - The core WooCommerce plugin
+- **woocommerce-beta-tester/** - Beta testing tool
+
+### packages/
+
+Shared code organized into reusable packages:
+
+#### packages/js/
+
+Over 30 JavaScript/TypeScript packages for building WooCommerce interfaces:
+
+```
+packages/js/
+├── components/          # Reusable React components
+├── data/                # Data stores and API clients
+├── admin-layout/        # Admin UI framework
+├── block-templates/     # Block template system
+├── currency/            # Currency utilities
+├── date/                # Date formatting
+├── navigation/          # Admin navigation
+├── number/              # Number formatting
+└── ...                  # And many more
+```
+
+<Info>
+Packages prefixed with `internal-` are not intended for public use and may change without notice.
+</Info>
+
+#### packages/php/
+
+PHP packages for WooCommerce functionality:
+
+```
+packages/php/
+├── blueprint/              # Site blueprint system
+├── email-editor/           # Email template editor
+├── monorepo-plugin/        # Monorepo utilities
+└── remote-specs-validation/  # Validation tools
+```
+
+### tools/
+
+Development and release tools:
+
+```
+tools/
+├── changelogger/        # Changelog management
+├── code-analyzer/       # Static analysis
+├── monorepo-utils/      # Monorepo utilities
+├── package-release/     # Release automation
+└── storybook/           # Component documentation
+```
+
+## WooCommerce Core Plugin Structure
+
+The main WooCommerce plugin at `plugins/woocommerce/` has a specific organization:
+
+```
+plugins/woocommerce/
+├── woocommerce.php          # Main plugin file
+├── src/                     # Modern PHP code (PSR-4)
+├── includes/                # Legacy WordPress code
+├── client/                  # React admin interface
+├── assets/                  # Frontend assets
+├── i18n/                    # Internationalization
+├── templates/               # Template files
+├── tests/                   # Test suites
+├── vendor/                  # Composer dependencies
+└── composer.json            # PHP dependencies
+```
+
+### src/ - Modern PHP Code
+
+The `src/` directory contains modern PHP code following PSR-4 autoloading standards:
+
+```
+src/
+├── Autoloader.php           # PSR-4 autoloader
+├── Packages.php             # Package loader
+├── Container.php            # DI container
+├── Admin/                   # Admin functionality
+│   ├── API/                 # REST API controllers
+│   └── Features/            # Admin features
+└── Internal/                # Internal classes
+    ├── Admin/               # Internal admin code
+    ├── DependencyManagement/ # DI system
+    └── ProductAttributesLookup/
+```
+
+<Note>
+**Namespace Convention**: `Automattic\WooCommerce\`
+
+- Public API classes go directly in `src/`
+- Internal implementation goes in `src/Internal/`
+</Note>
+
+### includes/ - Legacy Code
+
+The `includes/` directory contains legacy WordPress-style code:
+
+```
+includes/
+├── class-woocommerce.php    # Main WooCommerce class
+├── class-wc-install.php     # Installation routines
+├── wc-core-functions.php    # Core functions
+├── abstracts/               # Abstract classes
+│   ├── abstract-wc-product.php
+│   ├── abstract-wc-order.php
+│   └── abstract-wc-payment-gateway.php
+├── gateways/                # Payment gateways
+├── shipping/                # Shipping methods
+└── rest-api/                # REST API (v1, v2, v3)
+```
+
+<Warning>
+Avoid modifying code in `includes/` unless necessary. New functionality should be added to `src/` using modern patterns.
+</Warning>
+
+### client/ - React Admin
+
+React-based admin interface:
+
+```
+client/
+├── admin/                   # Admin app
+│   ├── client/              # React components
+│   └── config/              # Webpack config
+└── legacy/                  # Legacy admin code
+```
+
+### templates/
+
+PHP template files for the storefront:
+
+```
+templates/
+├── archive-product.php      # Product archive
+├── single-product.php       # Single product
+├── cart/                    # Cart templates
+├── checkout/                # Checkout templates
+├── myaccount/               # My Account templates
+└── single-product/          # Product page parts
+```
+
+<Info>
+Themes can override these templates by copying them to `your-theme/woocommerce/`.
+</Info>
+
+### tests/
+
+Test suites for WooCommerce:
+
+```
+tests/
+├── php/                     # PHPUnit tests
+│   ├── includes/            # Tests for includes/
+│   └── src/                 # Tests for src/
+├── e2e-pw/                  # Playwright E2E tests
+└── performance/             # Performance tests
+```
+
+## Configuration Files
+
+### Root Configuration
+
+<Tabs>
+  <Tab title="pnpm-workspace.yaml">
+    Defines workspace packages:
+    
+    ```yaml
+    packages:
+      - 'plugins/*'
+      - 'packages/js/*'
+      - 'packages/php/*'
+      - 'tools/*'
+    ```
+  </Tab>
+  
+  <Tab title="package.json">
+    Root package file with common scripts:
+    
+    ```json
+    {
+      "scripts": {
+        "build": "pnpm -r build",
+        "test": "pnpm -r test",
+        "lint": "pnpm -r lint"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="tsconfig.base.json">
+    Base TypeScript configuration:
+    
+    ```json
+    {
+      "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "strict": true
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Plugin Configuration
+
+Each plugin has its own configuration:
+
+- **package.json** - npm scripts and dependencies
+- **composer.json** - PHP dependencies
+- **.wp-env.json** - WordPress environment config
+- **phpunit.xml** - PHPUnit test configuration
+
+## Code Organization Principles
+
+### Modern vs Legacy
+
+<CardGroup cols={2}>
+  <Card title="Modern Code (src/)" icon="sparkles">
+    - PSR-4 autoloading
+    - Strict types
+    - Dependency injection
+    - Unit testable
+    - Type hints
+  </Card>
+  
+  <Card title="Legacy Code (includes/)" icon="clock">
+    - WordPress hooks
+    - Global functions
+    - Singletons
+    - Direct instantiation
+    - WordPress coding standards
+  </Card>
+</CardGroup>
+
+### When to Use Each
+
+**Use `src/` for:**
+- New features and functionality
+- Complex business logic
+- Code requiring unit tests
+- Internal services and utilities
+
+**Use `includes/` for:**
+- Maintaining existing functionality
+- WordPress-specific hooks
+- Template functions
+- Backward compatibility
+
+## Finding Your Way Around
+
+### Common Tasks
+
+<Accordion title="Where do I find...">
+  **Product classes:**
+  - Abstract: `includes/abstracts/abstract-wc-product.php`
+  - Simple: `includes/class-wc-product-simple.php`
+  - Variable: `includes/class-wc-product-variable.php`
+  
+  **Order classes:**
+  - Abstract: `includes/abstracts/abstract-wc-order.php`
+  - Order: `includes/class-wc-order.php`
+  - Order Item: `includes/class-wc-order-item.php`
+  
+  **REST API:**
+  - V3 Controllers: `src/Admin/API/` and `includes/rest-api/Controllers/Version3/`
+  - V2 Controllers: `includes/rest-api/Controllers/Version2/`
+  
+  **Admin Features:**
+  - Modern admin: `src/Admin/`
+  - React UI: `client/admin/`
+  - Legacy admin: `includes/admin/`
+  
+  **Frontend Templates:**
+  - All templates: `templates/`
+  - Template functions: `includes/wc-template-functions.php`
+  - Template hooks: `includes/wc-template-hooks.php`
+</Accordion>
+
+## Package Dependencies
+
+Packages can depend on each other. View dependencies in `package.json`:
+
+```json
+{
+  "dependencies": {
+    "@woocommerce/components": "workspace:*",
+    "@woocommerce/data": "workspace:*"
+  }
+}
+```
+
+<Note>
+`workspace:*` references packages within the monorepo.
+</Note>
+
+## Building and Development
+
+### Building Specific Packages
+
+```bash
+# Build WooCommerce Core
+pnpm --filter='@woocommerce/plugin-woocommerce' build
+
+# Build a JavaScript package
+pnpm --filter='@woocommerce/components' build
+
+# Build all JavaScript packages
+pnpm --filter='./packages/js/*' build
+```
+
+### Running Tests
+
+```bash
+# Test WooCommerce Core
+pnpm --filter='@woocommerce/plugin-woocommerce' test
+
+# Test all packages
+pnpm test
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Core Concepts"
+    icon="brain"
+    href="/core-concepts/architecture"
+  >
+    Learn about WooCommerce architecture
+  </Card>
+  <Card
+    title="Monorepo Workflow"
+    icon="diagram-project"
+    href="/core-concepts/monorepo"
+  >
+    Master monorepo development
+  </Card>
+  <Card
+    title="Modern vs Legacy"
+    icon="code-compare"
+    href="/core-concepts/modern-vs-legacy"
+  >
+    Understand code organization
+  </Card>
+  <Card
+    title="Extension Development"
+    icon="puzzle-piece"
+    href="/extensions/getting-started"
+  >
+    Start building extensions
+  </Card>
+</CardGroup>

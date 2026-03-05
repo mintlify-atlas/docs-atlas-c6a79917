@@ -1,0 +1,585 @@
+---
+title: Classic Theme Development
+description: Complete guide to developing WooCommerce classic themes with PHP templates, hooks, and template overrides
+---
+
+# Classic Theme Development
+
+Classic themes use PHP template files and WordPress hooks to create custom WooCommerce experiences. This approach provides complete control over markup and functionality while maintaining upgrade compatibility through proper template override practices.
+
+<Note>
+This guide covers classic PHP-based themes. For block theme development using HTML templates and FSE, see [Block Theme Development](/themes/block-themes).
+</Note>
+
+## Template File Structure
+
+WooCommerce organizes templates in a hierarchical structure within `wp-content/plugins/woocommerce/templates/`:
+
+```
+templates/
+├── archive-product.php              # Main shop page
+├── single-product.php               # Single product wrapper
+├── content-single-product.php       # Product content
+├── taxonomy-product-cat.php         # Category archives
+├── taxonomy-product-tag.php         # Tag archives
+├── taxonomy-product-attribute.php   # Attribute archives
+├── single-product/                  # Product page components
+│   ├── title.php
+│   ├── price.php
+│   ├── rating.php
+│   ├── product-image.php
+│   ├── product-thumbnails.php
+│   ├── tabs/
+│   │   ├── tabs.php
+│   │   ├── description.php
+│   │   └── additional-information.php
+│   └── add-to-cart/
+│       ├── simple.php
+│       ├── variable.php
+│       ├── grouped.php
+│       └── external.php
+├── cart/                            # Cart templates
+│   ├── cart.php
+│   ├── cart-empty.php
+│   └── mini-cart.php
+├── checkout/                        # Checkout templates
+│   ├── form-checkout.php
+│   ├── form-billing.php
+│   └── thankyou.php
+├── myaccount/                       # Customer account
+│   ├── my-account.php
+│   ├── dashboard.php
+│   ├── orders.php
+│   └── form-login.php
+├── emails/                          # Email templates
+│   ├── customer-new-order.php
+│   └── admin-new-order.php
+└── global/                          # Shared components
+    ├── wrapper-start.php
+    ├── wrapper-end.php
+    └── breadcrumb.php
+```
+
+## Overriding Templates
+
+Copy templates to your theme to customize them safely:
+
+<Steps>
+  <Step title="Create WooCommerce Directory">
+    In your theme folder, create a `woocommerce/` directory:
+    
+    ```
+    wp-content/themes/yourtheme/woocommerce/
+    ```
+  </Step>
+  
+  <Step title="Copy Template File">
+    Copy the template from WooCommerce plugin to your theme, **removing** the `/templates/` subdirectory:
+    
+    ```
+    FROM: wp-content/plugins/woocommerce/templates/emails/admin-new-order.php
+    TO:   wp-content/themes/yourtheme/woocommerce/emails/admin-new-order.php
+    ```
+  </Step>
+  
+  <Step title="Customize Template">
+    Edit the copied file in your theme. The theme version will now override the WooCommerce default.
+  </Step>
+  
+  <Step title="Maintain Templates">
+    When WooCommerce updates, check System Status for outdated templates and update them accordingly.
+  </Step>
+</Steps>
+
+### Example: Overriding Single Product Template
+
+```php
+<?php
+/**
+ * The Template for displaying all single products
+ * 
+ * Location: yourtheme/woocommerce/single-product.php
+ * 
+ * @package YourTheme
+ * @version 1.0.0
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+    exit; // Exit if accessed directly
+}
+
+get_header( 'shop' ); ?>
+
+    <?php
+    /**
+     * woocommerce_before_main_content hook.
+     *
+     * @hooked woocommerce_output_content_wrapper - 10
+     * @hooked woocommerce_breadcrumb - 20
+     */
+    do_action( 'woocommerce_before_main_content' );
+    ?>
+
+    <div class="custom-product-wrapper">
+        <?php while ( have_posts() ) : ?>
+            <?php the_post(); ?>
+            
+            <?php wc_get_template_part( 'content', 'single-product' ); ?>
+            
+        <?php endwhile; ?>
+    </div>
+
+    <?php
+    /**
+     * woocommerce_after_main_content hook.
+     *
+     * @hooked woocommerce_output_content_wrapper_end - 10
+     */
+    do_action( 'woocommerce_after_main_content' );
+    ?>
+
+    <?php
+    /**
+     * woocommerce_sidebar hook.
+     *
+     * @hooked woocommerce_get_sidebar - 10
+     */
+    do_action( 'woocommerce_sidebar' );
+    ?>
+
+<?php
+get_footer( 'shop' );
+```
+
+<Warning>
+Never edit templates directly in the WooCommerce plugin directory. Updates will overwrite your changes. Always use theme overrides.
+</Warning>
+
+<Warning>
+Never delete WooCommerce hooks when overriding templates. Removing hooks prevents plugins from adding content and breaks extensibility.
+</Warning>
+
+## Template Hooks
+
+WooCommerce templates are built around hooks that allow adding or moving content without editing template files. This is the **recommended customization method**.
+
+### Single Product Hooks
+
+The `content-single-product.php` template demonstrates extensive hook usage:
+
+```php
+<?php
+/**
+ * Hook: woocommerce_before_single_product.
+ *
+ * @hooked woocommerce_output_all_notices - 10
+ */
+do_action( 'woocommerce_before_single_product' );
+?>
+
+<div id="product-<?php the_ID(); ?>" <?php wc_product_class(); ?>>
+    <?php
+    /**
+     * Hook: woocommerce_before_single_product_summary.
+     *
+     * @hooked woocommerce_show_product_sale_flash - 10
+     * @hooked woocommerce_show_product_images - 20
+     */
+    do_action( 'woocommerce_before_single_product_summary' );
+    ?>
+
+    <div class="summary entry-summary">
+        <?php
+        /**
+         * Hook: woocommerce_single_product_summary.
+         *
+         * @hooked woocommerce_template_single_title - 5
+         * @hooked woocommerce_template_single_rating - 10
+         * @hooked woocommerce_template_single_price - 10
+         * @hooked woocommerce_template_single_excerpt - 20
+         * @hooked woocommerce_template_single_add_to_cart - 30
+         * @hooked woocommerce_template_single_meta - 40
+         * @hooked woocommerce_template_single_sharing - 50
+         */
+        do_action( 'woocommerce_single_product_summary' );
+        ?>
+    </div>
+
+    <?php
+    /**
+     * Hook: woocommerce_after_single_product_summary.
+     *
+     * @hooked woocommerce_output_product_data_tabs - 10
+     * @hooked woocommerce_upsell_display - 15
+     * @hooked woocommerce_output_related_products - 20
+     */
+    do_action( 'woocommerce_after_single_product_summary' );
+    ?>
+</div>
+
+<?php do_action( 'woocommerce_after_single_product' ); ?>
+```
+
+### Common Hook Examples
+
+<CodeGroup>
+
+```php Add Custom Content After Title
+/**
+ * Add custom badge after product title
+ */
+function mytheme_add_product_badge() {
+    global $product;
+    
+    if ( $product->is_on_sale() ) {
+        echo '<span class="custom-sale-badge">Hot Deal!</span>';
+    }
+}
+add_action( 'woocommerce_single_product_summary', 'mytheme_add_product_badge', 6 );
+```
+
+```php Remove Product Meta
+/**
+ * Remove product meta (SKU, categories, tags)
+ */
+remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_meta', 40 );
+```
+
+```php Reorder Product Elements
+/**
+ * Move price after add to cart button
+ */
+remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_price', 10 );
+add_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_price', 35 );
+```
+
+```php Custom Wrapper Elements
+/**
+ * Add custom wrapper around product images
+ */
+function mytheme_image_wrapper_start() {
+    echo '<div class="custom-image-wrapper">';
+}
+add_action( 'woocommerce_before_single_product_summary', 'mytheme_image_wrapper_start', 5 );
+
+function mytheme_image_wrapper_end() {
+    echo '</div>';
+}
+add_action( 'woocommerce_before_single_product_summary', 'mytheme_image_wrapper_end', 25 );
+```
+
+</CodeGroup>
+
+### Key Hook Categories
+
+| Hook Location | Purpose | Common Hooks |
+|--------------|---------|--------------|
+| **Main Content** | Wrapper elements | `woocommerce_before_main_content`, `woocommerce_after_main_content` |
+| **Product Summary** | Product details | `woocommerce_single_product_summary`, `woocommerce_before_single_product_summary` |
+| **Shop Loop** | Product listings | `woocommerce_before_shop_loop`, `woocommerce_after_shop_loop_item` |
+| **Cart** | Cart functionality | `woocommerce_before_cart`, `woocommerce_cart_contents` |
+| **Checkout** | Checkout process | `woocommerce_before_checkout_form`, `woocommerce_after_order_notes` |
+
+<Info>
+For a complete list of hooks, see the [WooCommerce Action Reference](https://woocommerce.com/documentation/plugins/woocommerce/woocommerce-codex/action-reference/).
+</Info>
+
+## Conditional Tags
+
+Use conditional tags to determine which WooCommerce page is being displayed and customize content accordingly.
+
+### Available Conditional Tags
+
+```php
+// General WooCommerce pages
+is_woocommerce()              // Any WooCommerce page (excl. cart/checkout)
+is_shop()                     // Main shop page
+is_product_category()         // Product category archive
+is_product_tag()              // Product tag archive
+is_product()                  // Single product page
+
+// Specific pages
+is_cart()                     // Cart page
+is_checkout()                 // Checkout page
+is_account_page()             // Customer account pages
+
+// Endpoints
+is_wc_endpoint_url()          // Any WooCommerce endpoint
+is_wc_endpoint_url('order-pay')  // Specific endpoint
+```
+
+### Conditional Tag Usage Examples
+
+<CodeGroup>
+
+```php Category-Specific Content
+/**
+ * Display custom message on specific category archives
+ */
+add_action( 'woocommerce_archive_description', 'mytheme_category_message' );
+
+function mytheme_category_message() {
+    if ( is_product_category( 'shirts' ) ) {
+        echo '<div class="category-message">';
+        echo '<p>Free shipping on all shirts this week!</p>';
+        echo '</div>';
+    }
+}
+```
+
+```php Product-Specific Customization
+/**
+ * Add custom content only on product pages
+ */
+add_action( 'woocommerce_after_single_product', 'mytheme_product_custom_content' );
+
+function mytheme_product_custom_content() {
+    if ( is_product() ) {
+        echo '<div class="custom-guarantee">';
+        echo '<p>30-day money-back guarantee</p>';
+        echo '</div>';
+    }
+}
+```
+
+```php Cart/Checkout Modifications
+/**
+ * Modify cart/checkout behavior
+ */
+function mytheme_custom_cart_script() {
+    if ( is_cart() || is_checkout() ) {
+        wp_enqueue_script( 'mytheme-cart-enhancements', 
+            get_template_directory_uri() . '/js/cart.js', 
+            array('jquery'), 
+            '1.0', 
+            true 
+        );
+    }
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_custom_cart_script' );
+```
+
+</CodeGroup>
+
+<Warning>
+Conditional tags only work after the `posts_selection` action hook. They **cannot** be used in the body of `functions.php` - always use them within hooked functions.
+</Warning>
+
+## WooCommerce Template Functions
+
+WooCommerce provides numerous template functions for outputting product information:
+
+### Product Information Functions
+
+```php
+// Product title and content
+wc_get_template_part( 'content', 'single-product' );
+woocommerce_template_single_title();
+woocommerce_template_single_excerpt();
+
+// Pricing
+woocommerce_template_single_price();
+woocommerce_template_loop_price();
+
+// Images
+woocommerce_show_product_images();
+woocommerce_show_product_thumbnails();
+woocommerce_show_product_sale_flash();
+
+// Add to cart
+woocommerce_template_single_add_to_cart();
+woocommerce_template_loop_add_to_cart();
+
+// Product meta
+woocommerce_template_single_meta();      // SKU, categories, tags
+woocommerce_template_single_rating();
+
+// Product tabs
+woocommerce_output_product_data_tabs();
+
+// Related products
+woocommerce_output_related_products();
+woocommerce_upsell_display();
+```
+
+### Shop Loop Functions
+
+```php
+// Loop structure
+woocommerce_product_loop_start();
+woocommerce_product_loop_end();
+
+// Loop meta
+woocommerce_result_count();
+woocommerce_catalog_ordering();
+
+// Pagination
+woocommerce_pagination();
+
+// Breadcrumbs
+woocommerce_breadcrumb();
+```
+
+## Integrating WooCommerce with Theme Layout
+
+### Method 1: Using Hooks (Recommended)
+
+Replace WooCommerce's default wrappers with your theme's markup:
+
+```php
+/**
+ * Remove default WooCommerce wrappers
+ */
+remove_action( 'woocommerce_before_main_content', 'woocommerce_output_content_wrapper', 10 );
+remove_action( 'woocommerce_after_main_content', 'woocommerce_output_content_wrapper_end', 10 );
+
+/**
+ * Add theme-specific wrappers
+ */
+add_action( 'woocommerce_before_main_content', 'mytheme_wrapper_start', 10 );
+add_action( 'woocommerce_after_main_content', 'mytheme_wrapper_end', 10 );
+
+function mytheme_wrapper_start() {
+    echo '<div id="primary" class="content-area">';
+    echo '<main id="main" class="site-main" role="main">';
+}
+
+function mytheme_wrapper_end() {
+    echo '</main>';
+    echo '</div>';
+}
+```
+
+This approach:
+- Requires minimal maintenance on updates
+- Keeps WooCommerce templates untouched
+- Integrates cleanly with theme structure
+
+### Method 2: woocommerce.php Template
+
+Create a single template handling all WooCommerce content:
+
+```php
+<?php
+/**
+ * WooCommerce Template
+ * 
+ * This template handles all WooCommerce pages
+ * Location: yourtheme/woocommerce.php
+ */
+
+get_header(); ?>
+
+<div id="primary" class="content-area">
+    <main id="main" class="site-main">
+        
+        <?php woocommerce_content(); ?>
+        
+    </main>
+</div>
+
+<?php
+get_sidebar();
+get_footer();
+```
+
+<Note>
+When using `woocommerce.php`, you cannot override `archive-product.php` as `woocommerce.php` takes priority.
+</Note>
+
+## Declaring Theme Support
+
+Always declare WooCommerce support in `functions.php`:
+
+```php
+function mytheme_add_woocommerce_support() {
+    add_theme_support( 'woocommerce', array(
+        'thumbnail_image_width' => 150,
+        'single_image_width'    => 300,
+        
+        'product_grid'          => array(
+            'default_rows'    => 3,
+            'min_rows'        => 2,
+            'max_rows'        => 8,
+            'default_columns' => 4,
+            'min_columns'     => 2,
+            'max_columns'     => 5,
+        ),
+    ) );
+    
+    // Enable product gallery features
+    add_theme_support( 'wc-product-gallery-zoom' );
+    add_theme_support( 'wc-product-gallery-lightbox' );
+    add_theme_support( 'wc-product-gallery-slider' );
+}
+add_action( 'after_setup_theme', 'mytheme_add_woocommerce_support' );
+```
+
+<Info>
+Use the `after_setup_theme` hook, not `init`. This ensures proper loading order.
+</Info>
+
+## Maintaining Template Compatibility
+
+<Steps>
+  <Step title="Monitor Template Versions">
+    WooCommerce includes version comments in templates:
+    
+    ```php
+    /**
+     * @version 3.6.0
+     */
+    ```
+    
+    Check **WooCommerce > Status > System Status** for outdated template warnings.
+  </Step>
+  
+  <Step title="Compare Template Changes">
+    When updates occur, compare your override with the new core template:
+    
+    ```bash
+    diff wp-content/themes/yourtheme/woocommerce/single-product.php \
+         wp-content/plugins/woocommerce/templates/single-product.php
+    ```
+  </Step>
+  
+  <Step title="Update Templates Selectively">
+    Only update templates that have meaningful changes. Not all version bumps require updates.
+  </Step>
+  
+  <Step title="Test After Updates">
+    Always test template functionality after updating WooCommerce or modified templates.
+  </Step>
+</Steps>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Prefer Hooks Over Overrides" icon="link">
+    Use hooks whenever possible. They're more maintainable and upgrade-safe than template overrides.
+  </Card>
+  
+  <Card title="Never Remove Hooks" icon="ban">
+    Always preserve `do_action()` calls in template overrides to maintain plugin compatibility.
+  </Card>
+  
+  <Card title="Document Template Versions" icon="file-code">
+    Add `@version` comments to custom templates noting the WooCommerce version they're based on.
+  </Card>
+  
+  <Card title="Use Child Themes" icon="code-branch">
+    Never modify parent theme files. Always use child themes for customizations.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Theme Customization" icon="palette" href="/themes/customization">
+    Learn CSS styling, child themes, and advanced customization techniques
+  </Card>
+  
+  <Card title="Template Reference" icon="code" href="https://github.com/woocommerce/woocommerce/tree/trunk/plugins/woocommerce/templates">
+    Browse all WooCommerce template files on GitHub
+  </Card>
+</CardGroup>

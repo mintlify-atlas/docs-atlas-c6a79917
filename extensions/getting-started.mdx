@@ -1,0 +1,219 @@
+---
+title: Getting started with extension development
+description: Learn how to build extensions for WooCommerce, understand what extensions can do, and explore the marketplace ecosystem
+---
+
+# Getting started with extension development
+
+WooCommerce extensions are WordPress plugins that extend or enhance the functionality of WooCommerce. This guide will help you understand the WooCommerce extension ecosystem and get started building your first extension.
+
+## What are WooCommerce extensions?
+
+WooCommerce extensions are regular WordPress plugins with special capabilities that integrate with WooCommerce's core functionality. They follow all standard WordPress plugin conventions while leveraging WooCommerce's extensive API, hooks, and filters.
+
+### What extensions can do
+
+Extensions can enhance WooCommerce in countless ways:
+
+- **Payment gateways**: Add new payment methods and integrate with payment providers
+- **Shipping methods**: Create custom shipping calculators and integrate with shipping carriers
+- **Product types**: Define new product types with unique behavior and attributes
+- **Admin tools**: Add reporting, analytics, bulk editing, and management features
+- **Frontend enhancements**: Customize the shopping experience, product display, and checkout flow
+- **Integrations**: Connect WooCommerce with third-party services, CRMs, and marketing platforms
+- **Notifications**: Send emails, SMS, or push notifications for various store events
+- **Tax calculators**: Implement custom tax calculation logic
+
+## The WooCommerce marketplace
+
+The [WooCommerce Marketplace](https://woocommerce.com/products/) is the official distribution platform for WooCommerce extensions. Here's what you need to know:
+
+### Benefits of the marketplace
+
+- **Built-in discovery**: Merchants find extensions through the WooCommerce admin and marketplace
+- **Trusted platform**: Extensions are reviewed for quality, security, and compatibility
+- **Revenue opportunity**: Sell your extensions to thousands of WooCommerce merchants
+- **Support infrastructure**: Access to support tools, documentation, and developer resources
+- **Automatic updates**: Merchants receive updates through the WordPress admin
+
+### Marketplace requirements
+
+Extensions submitted to the WooCommerce Marketplace must:
+
+- Follow all [WordPress plugin coding standards](https://developer.wordpress.org/plugins/)
+- Adhere to [WooCommerce extension best practices](/docs/extensions/best-practices)
+- Include proper documentation and support resources
+- Pass security and compatibility reviews
+- Comply with marketplace [compatibility guidelines](https://woocommerce.com/document/marketplace-overview/#section-9)
+
+## Development environment setup
+
+Before building WooCommerce extensions, set up a proper development environment.
+
+### Prerequisites
+
+<Steps>
+
+<Step title="Install WordPress">
+
+You'll need a local WordPress installation. Popular options include:
+
+- [Local by Flywheel](https://localwp.com/)
+- [XAMPP](https://www.apachefriends.org/)
+- [Docker with wp-env](https://developer.wordpress.org/block-editor/reference-guides/packages/packages-env/)
+
+</Step>
+
+<Step title="Install WooCommerce">
+
+Install and activate the WooCommerce plugin on your WordPress site. You can install it from:
+
+- The WordPress.org plugin repository
+- The [WooCommerce GitHub repository](https://github.com/woocommerce/woocommerce) for development versions
+
+</Step>
+
+<Step title="Enable debugging">
+
+Add these lines to your `wp-config.php` file to enable debugging:
+
+```php
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );
+define( 'WP_DEBUG_DISPLAY', false );
+define( 'SCRIPT_DEBUG', true );
+```
+
+This will log errors to `wp-content/debug.log` and use unminified JavaScript files.
+
+</Step>
+
+<Step title="Set up version control">
+
+Initialize a Git repository for your extension to track changes and collaborate with others.
+
+</Step>
+
+</Steps>
+
+## Development workflow
+
+A typical WooCommerce extension development workflow follows these stages:
+
+### 1. Planning and design
+
+- Define your extension's purpose and core features
+- Research existing solutions and identify gaps
+- Plan the user experience for both merchants and customers
+- Document the technical requirements and dependencies
+
+### 2. Development
+
+- Create the plugin structure and files
+- Implement core functionality using WooCommerce hooks and APIs
+- Follow [WordPress coding standards](https://developer.wordpress.org/coding-standards/)
+- Write secure, performant code
+- Add internationalization support
+
+### 3. Testing
+
+<Note>
+Testing is crucial for extension quality. Use the [Quality Insights Toolkit (QIT)](https://qit.woo.com/docs/) to test your extension against different versions of PHP, WooCommerce, and WordPress.
+</Note>
+
+Test your extension thoroughly:
+
+- **Functionality testing**: Verify all features work as expected
+- **Compatibility testing**: Test with different themes, plugins, PHP versions, and WooCommerce versions
+- **Performance testing**: Ensure your extension doesn't slow down the store
+- **Security testing**: Check for vulnerabilities and data leaks
+- **User testing**: Get feedback from actual merchants
+
+### 4. Documentation
+
+Create comprehensive documentation:
+
+- **Installation instructions**: How to install and activate the extension
+- **Configuration guide**: How to set up and configure features
+- **User guide**: How to use the extension's features
+- **Developer documentation**: Hooks, filters, and APIs your extension provides
+- **Troubleshooting**: Common issues and solutions
+
+### 5. Release and maintenance
+
+- Create a [changelog file](/docs/extensions/core-concepts/changelog-txt) documenting all changes
+- Version your extension following [semantic versioning](https://semver.org/)
+- Submit to the WooCommerce Marketplace or distribute independently
+- Provide ongoing support and bug fixes
+- Release updates for new WooCommerce versions
+
+## Key development concepts
+
+### Check if WooCommerce is active
+
+Most extensions should only run when WooCommerce is active. Always check before initializing your extension:
+
+```php
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
+    return;
+}
+```
+
+Learn more in [Check if WooCommerce is active](/docs/extensions/core-concepts/check-if-woo-is-active).
+
+### Use WooCommerce APIs
+
+Leverage WooCommerce's built-in functionality instead of building from scratch:
+
+- **[Product API](/docs/extensions/core-concepts/wc-get-products)**: Query and manipulate products
+- **[Order API](/docs/extensions/core-concepts/wc-get-orders)**: Work with orders and order data
+- **[Settings API](/docs/extensions/settings-api)**: Add settings pages and fields
+- **Customer API**: Access customer data and purchase history
+- **REST API**: Build integrations and headless commerce solutions
+
+### Extend with hooks and filters
+
+WooCommerce provides hundreds of [actions and filters](/docs/extensions/hooks-filters) for customization:
+
+```php
+// Add custom content after product title
+add_action( 'woocommerce_single_product_summary', 'add_custom_content', 6 );
+
+function add_custom_content() {
+    echo '<div class="custom-content">Custom content here</div>';
+}
+
+// Modify product price
+add_filter( 'woocommerce_product_get_price', 'modify_product_price', 10, 2 );
+
+function modify_product_price( $price, $product ) {
+    // Your custom pricing logic
+    return $price * 1.1; // Example: 10% markup
+}
+```
+
+### Avoid internal code
+
+<Warning>
+Never use internal WooCommerce code in your extensions. Classes in the `Automattic\WooCommerce\Internal` namespace and code marked with `@internal` annotations are for WooCommerce core use only. Backwards compatibility is not guaranteed.
+</Warning>
+
+Internal code may change, be renamed, or be removed in any future release without notice.
+
+## Next steps
+
+Now that you understand the basics of WooCommerce extension development:
+
+1. Follow the [first extension tutorial](/docs/extensions/first-extension) to build a simple extension
+2. Review [extension development best practices](/docs/extensions/best-practices)
+3. Learn about the [WooCommerce Settings API](/docs/extensions/settings-api)
+4. Explore [WooCommerce hooks and filters](/docs/extensions/hooks-filters)
+5. Study the [WooCommerce codebase](https://github.com/woocommerce/woocommerce) for real-world examples
+
+## Additional resources
+
+- [WooCommerce Developer Documentation](https://woocommerce.com/documentation/)
+- [WooCommerce Code Reference](https://woocommerce.com/wc-apidocs/)
+- [WordPress Plugin Developer Handbook](https://developer.wordpress.org/plugins/)
+- [Quality Insights Toolkit](https://qit.woo.com/docs/)
+- [WooCommerce GitHub Repository](https://github.com/woocommerce/woocommerce)

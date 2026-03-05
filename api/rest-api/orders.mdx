@@ -1,0 +1,795 @@
+---
+title: Orders REST API
+description: Manage orders through the WooCommerce REST API - list, create, update, and delete orders
+---
+
+# Orders API
+
+The Orders endpoint allows you to create, read, update, and delete orders in your WooCommerce store.
+
+## The Order Object
+
+### Order Properties
+
+<ResponseField name="id" type="integer" required>
+  Unique identifier for the order. Read-only.
+</ResponseField>
+
+<ResponseField name="parent_id" type="integer" default="0">
+  Parent order ID.
+</ResponseField>
+
+<ResponseField name="number" type="string">
+  Order number. Read-only.
+</ResponseField>
+
+<ResponseField name="order_key" type="string">
+  Order key. Read-only.
+</ResponseField>
+
+<ResponseField name="created_via" type="string">
+  How the order was created: `checkout`, `rest-api`, `admin`
+</ResponseField>
+
+<ResponseField name="status" type="string" default="pending">
+  Order status. Options: `pending`, `processing`, `on-hold`, `completed`, `cancelled`, `refunded`, `failed`, `trash`
+</ResponseField>
+
+<ResponseField name="currency" type="string">
+  Currency the order was created with, in ISO 4217 format.
+</ResponseField>
+
+<ResponseField name="date_created" type="string">
+  The date the order was created, in ISO8601 format. Read-only.
+</ResponseField>
+
+<ResponseField name="date_modified" type="string">
+  The date the order was last modified, in ISO8601 format. Read-only.
+</ResponseField>
+
+<ResponseField name="discount_total" type="string">
+  Total discount amount for the order. Read-only.
+</ResponseField>
+
+<ResponseField name="discount_tax" type="string">
+  Total discount tax amount for the order. Read-only.
+</ResponseField>
+
+<ResponseField name="shipping_total" type="string">
+  Total shipping amount for the order. Read-only.
+</ResponseField>
+
+<ResponseField name="shipping_tax" type="string">
+  Total shipping tax amount for the order. Read-only.
+</ResponseField>
+
+<ResponseField name="cart_tax" type="string">
+  Sum of line item taxes only. Read-only.
+</ResponseField>
+
+<ResponseField name="total" type="string">
+  Grand total. Read-only.
+</ResponseField>
+
+<ResponseField name="total_tax" type="string">
+  Sum of all taxes. Read-only.
+</ResponseField>
+
+<ResponseField name="customer_id" type="integer" default="0">
+  User ID who owns the order. 0 for guests.
+</ResponseField>
+
+<ResponseField name="billing" type="object">
+  Billing address.
+  ```json
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "company": "",
+    "address_1": "123 Main St",
+    "address_2": "Apt 4",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10001",
+    "country": "US",
+    "email": "john@example.com",
+    "phone": "555-1234"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="shipping" type="object">
+  Shipping address.
+  ```json
+  {
+    "first_name": "John",
+    "last_name": "Doe",
+    "company": "",
+    "address_1": "123 Main St",
+    "address_2": "Apt 4",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10001",
+    "country": "US"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="payment_method" type="string">
+  Payment method ID.
+</ResponseField>
+
+<ResponseField name="payment_method_title" type="string">
+  Payment method title.
+</ResponseField>
+
+<ResponseField name="transaction_id" type="string">
+  Unique transaction ID from payment gateway.
+</ResponseField>
+
+<ResponseField name="line_items" type="array">
+  Line items data.
+  ```json
+  [
+    {
+      "id": 789,
+      "name": "Premium T-Shirt",
+      "product_id": 123,
+      "quantity": 2,
+      "subtotal": "49.98",
+      "total": "49.98"
+    }
+  ]
+  ```
+</ResponseField>
+
+## List All Orders
+
+Retrieve a list of all orders in your store.
+
+<CodeGroup>
+```bash cURL
+curl https://example.com/wp-json/wc/v3/orders \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+const response = await api.get('/orders');
+console.log(response.data);
+```
+
+```python Python
+response = requests.get(
+    'https://example.com/wp-json/wc/v3/orders',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+orders = response.json()
+```
+
+```php PHP
+$orders = $woocommerce->get('orders');
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField query="page" type="integer" default="1">
+  Current page of the collection.
+</ParamField>
+
+<ParamField query="per_page" type="integer" default="10">
+  Maximum number of items to return (max 100).
+</ParamField>
+
+<ParamField query="search" type="string">
+  Limit results to those matching a string.
+</ParamField>
+
+<ParamField query="after" type="string">
+  Limit response to orders published after a given ISO8601 date.
+</ParamField>
+
+<ParamField query="before" type="string">
+  Limit response to orders published before a given ISO8601 date.
+</ParamField>
+
+<ParamField query="status" type="string" default="any">
+  Limit result set to orders with specific status. Options: `any`, `pending`, `processing`, `on-hold`, `completed`, `cancelled`, `refunded`, `failed`, `trash`
+</ParamField>
+
+<ParamField query="customer" type="integer">
+  Limit result set to orders assigned to a specific customer (ID).
+</ParamField>
+
+<ParamField query="product" type="integer">
+  Limit result set to orders that include a specific product (ID).
+</ParamField>
+
+<ParamField query="orderby" type="string" default="date">
+  Sort collection by attribute. Options: `date`, `id`, `title`, `slug`
+</ParamField>
+
+<ParamField query="order" type="string" default="desc">
+  Order sort direction. Options: `asc`, `desc`
+</ParamField>
+
+### Example Response
+
+```json
+[
+  {
+    "id": 456,
+    "parent_id": 0,
+    "number": "456",
+    "order_key": "wc_order_abc123def456",
+    "created_via": "checkout",
+    "version": "8.5.0",
+    "status": "processing",
+    "currency": "USD",
+    "date_created": "2024-02-15T14:30:00",
+    "date_created_gmt": "2024-02-15T19:30:00",
+    "date_modified": "2024-02-15T14:35:00",
+    "date_modified_gmt": "2024-02-15T19:35:00",
+    "discount_total": "5.00",
+    "discount_tax": "0.00",
+    "shipping_total": "10.00",
+    "shipping_tax": "0.80",
+    "cart_tax": "4.00",
+    "total": "69.80",
+    "total_tax": "4.80",
+    "prices_include_tax": false,
+    "customer_id": 789,
+    "customer_ip_address": "192.168.1.1",
+    "customer_user_agent": "Mozilla/5.0...",
+    "customer_note": "Please deliver after 5pm",
+    "billing": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "company": "Acme Inc",
+      "address_1": "123 Main Street",
+      "address_2": "Suite 100",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10001",
+      "country": "US",
+      "email": "john.doe@example.com",
+      "phone": "(555) 123-4567"
+    },
+    "shipping": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "company": "Acme Inc",
+      "address_1": "123 Main Street",
+      "address_2": "Suite 100",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10001",
+      "country": "US"
+    },
+    "payment_method": "stripe",
+    "payment_method_title": "Credit Card (Stripe)",
+    "transaction_id": "ch_1AbCdEfGhIjKlMnO",
+    "date_paid": "2024-02-15T14:35:00",
+    "date_paid_gmt": "2024-02-15T19:35:00",
+    "date_completed": null,
+    "date_completed_gmt": null,
+    "cart_hash": "abc123def456",
+    "meta_data": [],
+    "line_items": [
+      {
+        "id": 789,
+        "name": "Premium T-Shirt",
+        "product_id": 123,
+        "variation_id": 0,
+        "quantity": 2,
+        "tax_class": "",
+        "subtotal": "49.98",
+        "subtotal_tax": "4.00",
+        "total": "49.98",
+        "total_tax": "4.00",
+        "taxes": [],
+        "meta_data": [],
+        "sku": "TSHIRT-001",
+        "price": 24.99
+      }
+    ],
+    "tax_lines": [],
+    "shipping_lines": [
+      {
+        "id": 234,
+        "method_title": "Standard Shipping",
+        "method_id": "flat_rate",
+        "total": "10.00",
+        "total_tax": "0.80",
+        "taxes": []
+      }
+    ],
+    "fee_lines": [],
+    "coupon_lines": [
+      {
+        "id": 567,
+        "code": "SAVE5",
+        "discount": "5.00",
+        "discount_tax": "0.00"
+      }
+    ],
+    "refunds": []
+  }
+]
+```
+
+## Retrieve an Order
+
+Get details of a single order by ID.
+
+<CodeGroup>
+```bash cURL
+curl https://example.com/wp-json/wc/v3/orders/456 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+const response = await api.get('/orders/456');
+console.log(response.data);
+```
+
+```python Python
+response = requests.get(
+    'https://example.com/wp-json/wc/v3/orders/456',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+order = response.json()
+```
+
+```php PHP
+$order = $woocommerce->get('orders/456');
+```
+</CodeGroup>
+
+## Create an Order
+
+Create a new order in your store.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://example.com/wp-json/wc/v3/orders \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "payment_method": "bacs",
+    "payment_method_title": "Direct Bank Transfer",
+    "set_paid": true,
+    "billing": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "address_1": "123 Main Street",
+      "address_2": "",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10001",
+      "country": "US",
+      "email": "john.doe@example.com",
+      "phone": "(555) 123-4567"
+    },
+    "shipping": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "address_1": "123 Main Street",
+      "address_2": "",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10001",
+      "country": "US"
+    },
+    "line_items": [
+      {
+        "product_id": 123,
+        "quantity": 2
+      },
+      {
+        "product_id": 456,
+        "quantity": 1
+      }
+    ],
+    "shipping_lines": [
+      {
+        "method_id": "flat_rate",
+        "method_title": "Flat Rate",
+        "total": "10.00"
+      }
+    ]
+  }'
+```
+
+```javascript JavaScript
+const newOrder = {
+  payment_method: 'bacs',
+  payment_method_title: 'Direct Bank Transfer',
+  set_paid: true,
+  billing: {
+    first_name: 'John',
+    last_name: 'Doe',
+    address_1: '123 Main Street',
+    city: 'New York',
+    state: 'NY',
+    postcode: '10001',
+    country: 'US',
+    email: 'john.doe@example.com',
+    phone: '(555) 123-4567'
+  },
+  shipping: {
+    first_name: 'John',
+    last_name: 'Doe',
+    address_1: '123 Main Street',
+    city: 'New York',
+    state: 'NY',
+    postcode: '10001',
+    country: 'US'
+  },
+  line_items: [
+    {
+      product_id: 123,
+      quantity: 2
+    }
+  ],
+  shipping_lines: [
+    {
+      method_id: 'flat_rate',
+      method_title: 'Flat Rate',
+      total: '10.00'
+    }
+  ]
+};
+
+const response = await api.post('/orders', newOrder);
+console.log(response.data);
+```
+
+```python Python
+data = {
+    'payment_method': 'bacs',
+    'payment_method_title': 'Direct Bank Transfer',
+    'set_paid': True,
+    'billing': {
+        'first_name': 'John',
+        'last_name': 'Doe',
+        'address_1': '123 Main Street',
+        'city': 'New York',
+        'state': 'NY',
+        'postcode': '10001',
+        'country': 'US',
+        'email': 'john.doe@example.com',
+        'phone': '(555) 123-4567'
+    },
+    'line_items': [
+        {
+            'product_id': 123,
+            'quantity': 2
+        }
+    ],
+    'shipping_lines': [
+        {
+            'method_id': 'flat_rate',
+            'method_title': 'Flat Rate',
+            'total': '10.00'
+        }
+    ]
+}
+
+response = requests.post(
+    'https://example.com/wp-json/wc/v3/orders',
+    json=data,
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+order = response.json()
+```
+
+```php PHP
+$data = [
+    'payment_method' => 'bacs',
+    'payment_method_title' => 'Direct Bank Transfer',
+    'set_paid' => true,
+    'billing' => [
+        'first_name' => 'John',
+        'last_name' => 'Doe',
+        'address_1' => '123 Main Street',
+        'city' => 'New York',
+        'state' => 'NY',
+        'postcode' => '10001',
+        'country' => 'US',
+        'email' => 'john.doe@example.com',
+        'phone' => '(555) 123-4567'
+    ],
+    'line_items' => [
+        [
+            'product_id' => 123,
+            'quantity' => 2
+        ]
+    ],
+    'shipping_lines' => [
+        [
+            'method_id' => 'flat_rate',
+            'method_title' => 'Flat Rate',
+            'total' => '10.00'
+        ]
+    ]
+];
+
+$order = $woocommerce->post('orders', $data);
+```
+</CodeGroup>
+
+### Required Fields
+
+<Note>
+While no fields are strictly required, you should typically include billing information and at least one line item.
+</Note>
+
+### Important Fields
+
+<ParamField body="billing" type="object">
+  Billing address object (see Order Object above)
+</ParamField>
+
+<ParamField body="shipping" type="object">
+  Shipping address object (see Order Object above)
+</ParamField>
+
+<ParamField body="line_items" type="array">
+  Array of line item objects
+  ```json
+  [{"product_id": 123, "quantity": 2}]
+  ```
+</ParamField>
+
+<ParamField body="shipping_lines" type="array">
+  Array of shipping line objects
+  ```json
+  [{"method_id": "flat_rate", "method_title": "Flat Rate", "total": "10.00"}]
+  ```
+</ParamField>
+
+<ParamField body="coupon_lines" type="array">
+  Array of coupon line objects
+  ```json
+  [{"code": "SAVE10"}]
+  ```
+</ParamField>
+
+<ParamField body="customer_id" type="integer">
+  User ID. Set to 0 for guest checkout.
+</ParamField>
+
+<ParamField body="status" type="string" default="pending">
+  Order status: `pending`, `processing`, `on-hold`, `completed`, `cancelled`, `refunded`, `failed`
+</ParamField>
+
+<ParamField body="set_paid" type="boolean" default="false">
+  Set to true to mark order as paid.
+</ParamField>
+
+## Update an Order
+
+Update an existing order.
+
+<CodeGroup>
+```bash cURL
+curl -X PUT https://example.com/wp-json/wc/v3/orders/456 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "status": "completed"
+  }'
+```
+
+```javascript JavaScript
+const updates = {
+  status: 'completed'
+};
+
+const response = await api.put('/orders/456', updates);
+console.log(response.data);
+```
+
+```python Python
+data = {
+    'status': 'completed'
+}
+
+response = requests.put(
+    'https://example.com/wp-json/wc/v3/orders/456',
+    json=data,
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+order = response.json()
+```
+
+```php PHP
+$data = [
+    'status' => 'completed'
+];
+
+$order = $woocommerce->put('orders/456', $data);
+```
+</CodeGroup>
+
+## Delete an Order
+
+Delete an order permanently or move it to trash.
+
+<CodeGroup>
+```bash cURL (Move to Trash)
+curl -X DELETE https://example.com/wp-json/wc/v3/orders/456 \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```bash cURL (Permanent Delete)
+curl -X DELETE https://example.com/wp-json/wc/v3/orders/456?force=true \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+```javascript JavaScript
+// Move to trash
+await api.delete('/orders/456');
+
+// Permanent delete
+await api.delete('/orders/456', { params: { force: true } });
+```
+
+```python Python
+# Move to trash
+requests.delete(
+    'https://example.com/wp-json/wc/v3/orders/456',
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+
+# Permanent delete
+requests.delete(
+    'https://example.com/wp-json/wc/v3/orders/456',
+    params={'force': True},
+    auth=HTTPBasicAuth(consumer_key, consumer_secret)
+)
+```
+
+```php PHP
+// Move to trash
+$woocommerce->delete('orders/456');
+
+// Permanent delete
+$woocommerce->delete('orders/456', ['force' => true]);
+```
+</CodeGroup>
+
+## Batch Update Orders
+
+Create, update, and delete multiple orders in a single request.
+
+```bash
+curl -X POST https://example.com/wp-json/wc/v3/orders/batch \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "update": [
+      {
+        "id": 456,
+        "status": "completed"
+      },
+      {
+        "id": 789,
+        "status": "processing"
+      }
+    ]
+  }'
+```
+
+## Order Notes
+
+Manage notes attached to orders.
+
+### List Order Notes
+
+```bash
+curl https://example.com/wp-json/wc/v3/orders/456/notes \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Create Order Note
+
+```bash
+curl -X POST https://example.com/wp-json/wc/v3/orders/456/notes \
+  -u ck_1234567890abcdef:cs_1234567890abcdef \
+  -H "Content-Type: application/json" \
+  -d '{
+    "note": "Order has been shipped via FedEx",
+    "customer_note": true
+  }'
+```
+
+## Common Use Cases
+
+### Get Orders by Status
+
+```bash
+curl "https://example.com/wp-json/wc/v3/orders?status=processing" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Get Customer's Orders
+
+```bash
+curl "https://example.com/wp-json/wc/v3/orders?customer=789" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Get Orders by Date Range
+
+```bash
+curl "https://example.com/wp-json/wc/v3/orders?after=2024-01-01T00:00:00&before=2024-12-31T23:59:59" \
+  -u ck_1234567890abcdef:cs_1234567890abcdef
+```
+
+### Mark Order as Completed
+
+```javascript
+await api.put('/orders/456', {
+  status: 'completed'
+});
+```
+
+### Add Tracking Information
+
+```javascript
+await api.post('/orders/456/notes', {
+  note: 'Tracking number: 1Z999AA10123456784',
+  customer_note: true
+});
+```
+
+## Error Handling
+
+### Invalid Order ID
+
+```json
+{
+  "code": "woocommerce_rest_shop_order_invalid_id",
+  "message": "Invalid order ID.",
+  "data": {
+    "status": 404
+  }
+}
+```
+
+### Invalid Product in Line Item
+
+```json
+{
+  "code": "woocommerce_rest_invalid_product_id",
+  "message": "Invalid product ID.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+### Insufficient Stock
+
+```json
+{
+  "code": "woocommerce_rest_product_not_enough_stock",
+  "message": "Not enough stock available.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Products API" icon="box" href="/api/rest-api/products">
+    Manage store products
+  </Card>
+  <Card title="Customers API" icon="users" href="/api/rest-api/customers">
+    Work with customer data
+  </Card>
+</CardGroup>

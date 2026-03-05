@@ -1,0 +1,942 @@
+---
+title: WooCommerce Block Development Tutorials
+description: Step-by-step tutorials for creating custom WooCommerce blocks and extensions
+---
+
+# WooCommerce Block Development Tutorials
+
+Learn how to build custom WooCommerce blocks through practical, hands-on tutorials. Each tutorial includes complete code examples from the WooCommerce monorepo.
+
+## Tutorial 1: Create a Checkout Newsletter Block
+
+Build a custom inner block for the Checkout that adds a newsletter subscription checkbox.
+
+<Steps>
+
+### Set Up the Development Environment
+
+Create a new plugin using the official WooCommerce block template:
+
+```bash
+cd wp-content/plugins
+npx @wordpress/create-block -t @woocommerce/extend-cart-checkout-block newsletter-subscription
+cd newsletter-subscription
+npm install
+```
+
+This generates a complete plugin structure with:
+- Build configuration (Webpack + `@wordpress/scripts`)
+- Example checkout block template
+- PHP integration boilerplate
+
+### Define the Block Metadata
+
+Create `src/newsletter-block/block.json`:
+
+```json
+{
+  "apiVersion": 3,
+  "name": "my-store/checkout-newsletter",
+  "version": "1.0.0",
+  "title": "Newsletter Subscription",
+  "category": "woocommerce",
+  "description": "Adds a newsletter subscription checkbox to checkout",
+  "supports": {
+    "html": false,
+    "align": false,
+    "multiple": false,
+    "reusable": false
+  },
+  "parent": [
+    "woocommerce/checkout-contact-information-block"
+  ],
+  "attributes": {
+    "lock": {
+      "type": "object",
+      "default": {
+        "remove": true,
+        "move": true
+      }
+    },
+    "text": {
+      "type": "string",
+      "default": "Subscribe to our newsletter for exclusive offers"
+    }
+  },
+  "textdomain": "newsletter-subscription"
+}
+```
+
+<Note>
+The `parent` property ensures this block can only be added to the Checkout Contact Information block.
+</Note>
+
+### Create the Edit Component
+
+Create `src/newsletter-block/edit.tsx`:
+
+```typescript
+import { useBlockProps, RichText, InspectorControls } from '@wordpress/block-editor';
+import { PanelBody, ToggleControl } from '@wordpress/components';
+import { CheckboxControl } from '@woocommerce/blocks-checkout';
+import { __ } from '@wordpress/i18n';
+import './editor.scss';
+
+interface Attributes {
+  text: string;
+  checked: boolean;
+}
+
+export const Edit = ({ attributes, setAttributes }: {
+  attributes: Attributes;
+  setAttributes: (attrs: Partial<Attributes>) => void;
+}) => {
+  const { text } = attributes;
+  const blockProps = useBlockProps();
+
+  return (
+    <>
+      <InspectorControls>
+        <PanelBody title={__('Newsletter Settings', 'newsletter-subscription')}>
+          <p>{__('Customize the newsletter subscription checkbox', 'newsletter-subscription')}</p>
+        </PanelBody>
+      </InspectorControls>
+      
+      <div {...blockProps}>
+        <div className="wc-block-checkout-newsletter">
+          <CheckboxControl
+            id="newsletter-opt-in"
+            checked={false}
+            disabled={true}
+          />
+          <RichText
+            value={text}
+            onChange={(value) => setAttributes({ text: value })}
+            placeholder={__('Enter newsletter text...', 'newsletter-subscription')}
+            tagName="label"
+            className="wc-block-checkout-newsletter__label"
+          />
+        </div>
+      </div>
+    </>
+  );
+};
+
+export const Save = () => {
+  // Rendered dynamically on frontend
+  return null;
+};
+```
+
+### Register the Block
+
+Create `src/newsletter-block/index.tsx`:
+
+```typescript
+import { registerBlockType } from '@wordpress/blocks';
+import { Icon } from '@wordpress/components';
+import { Edit, Save } from './edit';
+import metadata from './block.json';
+
+registerBlockType(metadata, {
+  icon: {
+    src: (
+      <Icon
+        icon={(
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M22 6c0-1.1-.9-2-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6zm-2 0l-8 5-8-5h16zm0 12H4V8l8 5 8-5v10z" />
+          </svg>
+        )}
+      />
+    ),
+    foreground: '#874FB9',
+  },
+  edit: Edit,
+  save: Save,
+});
+```
+
+### Add Frontend Rendering
+
+Create `src/newsletter-block/frontend.tsx`:
+
+```typescript
+import { useState } from '@wordpress/element';
+import { CheckboxControl } from '@woocommerce/blocks-checkout';
+import { useSelect } from '@wordpress/data';
+
+interface NewsletterBlockProps {
+  text: string;
+  checkoutExtensionData: any;
+}
+
+export const NewsletterBlock = ({ text, checkoutExtensionData }: NewsletterBlockProps) => {
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  // Update checkout extension data when checkbox changes
+  const { setExtensionData } = checkoutExtensionData;
+
+  const handleChange = (checked: boolean) => {
+    setIsSubscribed(checked);
+    setExtensionData('my-store', 'newsletter-subscription', {
+      subscribed: checked,
+    });
+  };
+
+  return (
+    <div className="wc-block-checkout-newsletter">
+      <CheckboxControl
+        id="newsletter-opt-in"
+        checked={isSubscribed}
+        onChange={handleChange}
+      />
+      <label htmlFor="newsletter-opt-in" className="wc-block-checkout-newsletter__label">
+        {text}
+      </label>
+    </div>
+  );
+};
+```
+
+### PHP Integration
+
+Create `includes/class-newsletter-integration.php`:
+
+```php
+<?php
+namespace MyStore\NewsletterSubscription;
+
+use Automattic\WooCommerce\Blocks\Integrations\IntegrationInterface;
+
+class Newsletter_Integration implements IntegrationInterface {
+  public function get_name() {
+    return 'newsletter-subscription';
+  }
+
+  public function initialize() {
+    $this->register_block_frontend_scripts();
+    $this->register_block_editor_scripts();
+  }
+
+  public function get_script_handles() {
+    return ['newsletter-subscription-frontend'];
+  }
+
+  public function get_editor_script_handles() {
+    return ['newsletter-subscription-editor'];
+  }
+
+  public function get_script_data() {
+    return [
+      'newsletter_subscription' => [
+        'enabled' => true,
+      ],
+    ];
+  }
+
+  private function register_block_frontend_scripts() {
+    $script_path = '/build/newsletter-frontend.js';
+    $script_asset_path = dirname(__FILE__, 2) . '/build/newsletter-frontend.asset.php';
+    $script_asset = file_exists($script_asset_path)
+      ? require $script_asset_path
+      : ['dependencies' => [], 'version' => '1.0.0'];
+
+    wp_register_script(
+      'newsletter-subscription-frontend',
+      plugins_url($script_path, dirname(__FILE__)),
+      $script_asset['dependencies'],
+      $script_asset['version'],
+      true
+    );
+  }
+
+  private function register_block_editor_scripts() {
+    $script_path = '/build/newsletter-editor.js';
+    $script_asset_path = dirname(__FILE__, 2) . '/build/newsletter-editor.asset.php';
+    $script_asset = file_exists($script_asset_path)
+      ? require $script_asset_path
+      : ['dependencies' => [], 'version' => '1.0.0'];
+
+    wp_register_script(
+      'newsletter-subscription-editor',
+      plugins_url($script_path, dirname(__FILE__)),
+      $script_asset['dependencies'],
+      $script_asset['version'],
+      true
+    );
+  }
+}
+```
+
+### Register Integration
+
+In your main plugin file:
+
+```php
+<?php
+/**
+ * Plugin Name: Newsletter Subscription for Checkout
+ * Description: Adds newsletter subscription to WooCommerce Checkout block
+ * Version: 1.0.0
+ */
+
+add_action('woocommerce_blocks_loaded', function() {
+  require_once __DIR__ . '/includes/class-newsletter-integration.php';
+  
+  add_action(
+    'woocommerce_blocks_checkout_block_registration',
+    function($integration_registry) {
+      $integration_registry->register(
+        new \MyStore\NewsletterSubscription\Newsletter_Integration()
+      );
+    }
+  );
+});
+```
+
+### Build and Test
+
+```bash
+npm run build
+```
+
+Activate the plugin, add the Checkout block to a page, and insert your Newsletter Subscription block inside the Contact Information section.
+
+</Steps>
+
+## Tutorial 2: Add Custom Product Filter
+
+Create a custom filter for the Product Collection block that filters by custom product attributes.
+
+<Steps>
+
+### Register a Custom Collection
+
+Create `src/custom-collection/index.ts`:
+
+```typescript
+import { __experimentalRegisterProductCollection } from '@woocommerce/blocks-registry';
+import { __ } from '@wordpress/i18n';
+
+__experimentalRegisterProductCollection({
+  name: 'my-store/eco-friendly-products',
+  title: __('Eco-Friendly Products', 'my-store'),
+  icon: 'leaf',
+  description: __('Display environmentally friendly products', 'my-store'),
+  keywords: ['eco', 'green', 'sustainable', 'organic'],
+  attributes: {
+    query: {
+      perPage: 12,
+      woocommerceAttributes: [
+        {
+          taxonomy: 'pa_eco_certified',
+          termId: 0, // Will be set dynamically
+        },
+      ],
+    },
+    displayLayout: {
+      type: 'grid',
+      columns: 3,
+      shrinkColumns: true,
+    },
+    hideControls: ['stock-status', 'hand-picked'],
+  },
+  innerBlocks: [
+    [
+      'core/heading',
+      {
+        textAlign: 'center',
+        level: 2,
+        content: __('🌱 Sustainable Products', 'my-store'),
+      },
+    ],
+    [
+      'woocommerce/product-template',
+      {},
+      [
+        ['woocommerce/product-image', { imageSizing: 'cropped' }],
+        ['woocommerce/product-title', { fontSize: 'medium' }],
+        [
+          'woocommerce/product-price',
+          {
+            fontSize: 'small',
+            textAlign: 'center',
+          },
+        ],
+        ['woocommerce/product-button', { textAlign: 'center' }],
+      ],
+    ],
+  ],
+});
+```
+
+### Add Preview State
+
+```typescript
+__experimentalRegisterProductCollection({
+  name: 'my-store/featured-on-sale',
+  title: __('Featured Sale Items', 'my-store'),
+  icon: 'tag',
+  description: __('Featured products currently on sale', 'my-store'),
+  preview: {
+    initialPreviewState: {
+      isPreview: false,
+      previewMessage: '',
+    },
+    setPreviewState: ({ setState, attributes, location }) => {
+      // Show preview if not enough products match criteria
+      const checkProductCount = async () => {
+        const response = await fetch(
+          '/wp-json/wc/store/v1/products?featured=true&on_sale=true&per_page=1'
+        );
+        const products = await response.json();
+        
+        if (products.length === 0) {
+          setState({
+            isPreview: true,
+            previewMessage: __(
+              'No featured sale products available. Showing preview.',
+              'my-store'
+            ),
+          });
+        }
+      };
+      
+      checkProductCount();
+    },
+  },
+  attributes: {
+    query: {
+      featured: true,
+      woocommerceOnSale: true,
+      orderBy: 'popularity',
+    },
+  },
+});
+```
+
+### Enqueue the Script
+
+```php
+function my_store_enqueue_collection_scripts() {
+  $script_path = '/build/custom-collection.js';
+  $script_asset_path = plugin_dir_path(__FILE__) . 'build/custom-collection.asset.php';
+  $script_asset = require $script_asset_path;
+
+  wp_enqueue_script(
+    'my-store-custom-collection',
+    plugins_url($script_path, __FILE__),
+    $script_asset['dependencies'],
+    $script_asset['version'],
+    true
+  );
+}
+add_action('enqueue_block_editor_assets', 'my_store_enqueue_collection_scripts');
+```
+
+</Steps>
+
+## Tutorial 3: Customize Cart with Filters
+
+Modify cart item display using the Filter Registry.
+
+<Steps>
+
+### Create Filter Registration
+
+Create `src/cart-filters/index.ts`:
+
+```typescript
+import { registerCheckoutFilters } from '@woocommerce/blocks-checkout';
+import { __ } from '@wordpress/i18n';
+
+const FEATURED_CATEGORY_ID = 15; // Replace with your category ID
+
+registerCheckoutFilters('my-store-cart-customizations', {
+  // Add custom CSS class to featured products
+  cartItemClass: (defaultValue, extensions, args) => {
+    const { cartItem } = args;
+    
+    if (cartItem.categories?.some((cat) => cat.id === FEATURED_CATEGORY_ID)) {
+      return `${defaultValue} featured-cart-item`;
+    }
+    
+    return defaultValue;
+  },
+
+  // Add badge to product names
+  itemName: (defaultValue, extensions, args) => {
+    const { cartItem } = args;
+    
+    // Add "Bestseller" badge
+    if (cartItem.extensions?.productMetadata?.isBestseller) {
+      return `${defaultValue} <span class="bestseller-badge">⭐ Bestseller</span>`;
+    }
+    
+    // Add "New" badge for products less than 30 days old
+    const productDate = new Date(cartItem.extensions?.productMetadata?.dateCreated);
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    if (productDate > thirtyDaysAgo) {
+      return `${defaultValue} <span class="new-badge">🆕 New</span>`;
+    }
+    
+    return defaultValue;
+  },
+
+  // Customize price display with tax information
+  cartItemPrice: (defaultValue, extensions, args) => {
+    const { cartItem, context } = args;
+    
+    // Only modify in cart context, not checkout summary
+    if (context === 'woocommerce/cart') {
+      const taxAmount = cartItem.prices.price - cartItem.prices.regular_price;
+      
+      if (taxAmount > 0) {
+        return `<price/> <small>(incl. ${formatPrice(taxAmount)} tax)</small>`;
+      }
+    }
+    
+    return defaultValue;
+  },
+
+  // Add "You save" message to sale items
+  subtotalPriceFormat: (defaultValue, extensions, args) => {
+    const { cartItem } = args;
+    
+    if (cartItem.prices.on_sale) {
+      const savings = cartItem.prices.regular_price - cartItem.prices.sale_price;
+      const savingsPercentage = Math.round(
+        (savings / cartItem.prices.regular_price) * 100
+      );
+      
+      return `<price/> <span class="cart-savings">You save ${savingsPercentage}%!</span>`;
+    }
+    
+    return defaultValue;
+  },
+
+  // Conditionally hide remove link for subscription items
+  showRemoveItemLink: (defaultValue, extensions, args) => {
+    const { cartItem } = args;
+    
+    // Don't allow removal of subscription products
+    if (cartItem.extensions?.subscription?.isSubscription) {
+      return false;
+    }
+    
+    return defaultValue;
+  },
+
+  // Customize total label
+  totalLabel: (defaultValue, extensions, args) => {
+    return __('Total Amount Due', 'my-store');
+  },
+
+  // Add payment method fees to total value
+  totalValue: (defaultValue, extensions, args) => {
+    const selectedPaymentMethod = extensions?.paymentMethod?.selectedMethod;
+    
+    if (selectedPaymentMethod === 'credit-card') {
+      return `${defaultValue} <small>+ processing fee</small>`;
+    }
+    
+    return defaultValue;
+  },
+});
+
+// Helper function
+function formatPrice(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount / 100);
+}
+```
+
+### Add Custom Styles
+
+Create `src/cart-filters/style.scss`:
+
+```scss
+.featured-cart-item {
+  background: linear-gradient(90deg, #fff9e6 0%, #ffffff 100%);
+  border-left: 3px solid #ffd700;
+}
+
+.bestseller-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #ff9800;
+  color: white;
+  font-size: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.new-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background: #4caf50;
+  color: white;
+  font-size: 12px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.cart-savings {
+  display: block;
+  color: #4caf50;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 4px;
+}
+```
+
+### Extend Store API for Custom Data
+
+Create `includes/class-store-api-extension.php`:
+
+```php
+<?php
+namespace MyStore\CartFilters;
+
+use Automattic\WooCommerce\StoreApi\Schemas\V1\CartItemSchema;
+
+class Store_API_Extension {
+  public function init() {
+    add_action('woocommerce_store_api_cart_item_data', [$this, 'extend_cart_item_data'], 10, 2);
+  }
+
+  public function extend_cart_item_data($cart_item_data, $cart_item) {
+    $product = $cart_item['data'];
+    
+    $cart_item_data['extensions']['productMetadata'] = [
+      'isBestseller' => get_post_meta($product->get_id(), '_is_bestseller', true) === 'yes',
+      'dateCreated' => $product->get_date_created()->format('c'),
+    ];
+    
+    return $cart_item_data;
+  }
+}
+
+add_action('init', function() {
+  $extension = new Store_API_Extension();
+  $extension->init();
+});
+```
+
+</Steps>
+
+## Tutorial 4: Add Additional Checkout Fields
+
+Add custom fields to collect special delivery instructions.
+
+<Steps>
+
+### Register Additional Fields
+
+Create `includes/additional-fields.php`:
+
+```php
+<?php
+add_action('woocommerce_init', function() {
+  if (!function_exists('woocommerce_register_additional_checkout_field')) {
+    return;
+  }
+
+  // Delivery instructions (order-specific)
+  woocommerce_register_additional_checkout_field([
+    'id' => 'my-store/delivery-instructions',
+    'label' => __('Delivery Instructions', 'my-store'),
+    'location' => 'order',
+    'type' => 'text',
+    'required' => false,
+    'attributes' => [
+      'placeholder' => __('e.g. Leave at front door', 'my-store'),
+      'maxLength' => 200,
+    ],
+  ]);
+
+  // Preferred delivery time (order-specific)
+  woocommerce_register_additional_checkout_field([
+    'id' => 'my-store/delivery-time',
+    'label' => __('Preferred Delivery Time', 'my-store'),
+    'location' => 'order',
+    'type' => 'select',
+    'required' => false,
+    'options' => [
+      ['value' => 'morning', 'label' => __('Morning (9AM - 12PM)', 'my-store')],
+      ['value' => 'afternoon', 'label' => __('Afternoon (12PM - 5PM)', 'my-store')],
+      ['value' => 'evening', 'label' => __('Evening (5PM - 8PM)', 'my-store')],
+      ['value' => 'any', 'label' => __('Any time', 'my-store')],
+    ],
+  ]);
+
+  // Company VAT (address field)
+  woocommerce_register_additional_checkout_field([
+    'id' => 'my-store/vat-number',
+    'label' => __('VAT Number', 'my-store'),
+    'location' => 'address',
+    'type' => 'text',
+    'required' => false,
+    'attributes' => [
+      'pattern' => '[A-Z]{2}[0-9]{9}',
+      'title' => __('Format: XX123456789', 'my-store'),
+    ],
+    'validate_callback' => function($value) {
+      if ($value && !preg_match('/^[A-Z]{2}[0-9]{9}$/', $value)) {
+        return new \WP_Error(
+          'invalid_vat',
+          __('Please enter a valid VAT number (e.g., GB123456789)', 'my-store')
+        );
+      }
+    },
+    'sanitize_callback' => function($value) {
+      return strtoupper(sanitize_text_field($value));
+    },
+  ]);
+
+  // Age verification (contact field)
+  woocommerce_register_additional_checkout_field([
+    'id' => 'my-store/age-verification',
+    'label' => __('I confirm I am over 18 years old', 'my-store'),
+    'location' => 'contact',
+    'type' => 'checkbox',
+    'required' => true,
+    'validate_callback' => function($value) {
+      if (!$value) {
+        return new \WP_Error(
+          'age_verification_required',
+          __('You must be over 18 to purchase these products.', 'my-store')
+        );
+      }
+    },
+  ]);
+});
+```
+
+### Access Field Values
+
+Create `includes/order-processing.php`:
+
+```php
+<?php
+use Automattic\WooCommerce\Blocks\Package;
+use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields;
+
+add_action('woocommerce_checkout_order_processed', function($order_id) {
+  $order = wc_get_order($order_id);
+  $checkout_fields = Package::container()->get(CheckoutFields::class);
+
+  // Get delivery instructions
+  $instructions = $checkout_fields->get_field_from_object(
+    'my-store/delivery-instructions',
+    $order,
+    'other'
+  );
+
+  if ($instructions) {
+    // Add to order notes
+    $order->add_order_note(
+      sprintf(__('Delivery instructions: %s', 'my-store'), $instructions)
+    );
+    
+    // Send to delivery service API
+    send_to_delivery_service($order_id, [
+      'instructions' => $instructions,
+      'preferred_time' => $checkout_fields->get_field_from_object(
+        'my-store/delivery-time',
+        $order,
+        'other'
+      ),
+    ]);
+  }
+
+  // Get VAT number from billing address
+  $vat_number = $checkout_fields->get_field_from_object(
+    'my-store/vat-number',
+    $order,
+    'billing'
+  );
+
+  if ($vat_number) {
+    update_post_meta($order_id, '_billing_vat_number', $vat_number);
+    
+    // Validate with EU VAT service
+    validate_eu_vat_number($vat_number, $order);
+  }
+});
+```
+
+### Display in Admin
+
+```php
+add_action('woocommerce_admin_order_data_after_billing_address', function($order) {
+  $checkout_fields = Package::container()->get(CheckoutFields::class);
+  
+  $instructions = $checkout_fields->get_field_from_object(
+    'my-store/delivery-instructions',
+    $order,
+    'other'
+  );
+  
+  if ($instructions) {
+    echo '<div class="order-delivery-instructions">';
+    echo '<h3>' . __('Delivery Instructions', 'my-store') . '</h3>';
+    echo '<p>' . esc_html($instructions) . '</p>';
+    echo '</div>';
+  }
+});
+```
+
+</Steps>
+
+## Tutorial 5: Create a Product Editor Block
+
+Build a custom block for the Product Editor to manage warranty information.
+
+<Steps>
+
+### Create Block Scaffold
+
+```bash
+npx @wordpress/create-block --template @woocommerce/create-product-editor-block warranty-info
+cd warranty-info
+npm install
+```
+
+### Define Block Metadata
+
+```json
+{
+  "$schema": "https://schemas.wp.org/trunk/block.json",
+  "apiVersion": 3,
+  "name": "my-store/product-warranty",
+  "title": "Product Warranty",
+  "category": "woocommerce",
+  "description": "Manage product warranty information",
+  "textdomain": "warranty-info",
+  "attributes": {
+    "warrantyDuration": {
+      "type": "number",
+      "default": 12
+    },
+    "warrantyType": {
+      "type": "string",
+      "default": "limited"
+    }
+  },
+  "supports": {
+    "align": false
+  }
+}
+```
+
+### Create Edit Component
+
+```tsx
+import { useWooBlockProps } from '@woocommerce/block-templates';
+import { useEntityProp } from '@wordpress/core-data';
+import { __ } from '@wordpress/i18n';
+import {
+  BaseControl,
+  SelectControl,
+  __experimentalNumberControl as NumberControl,
+} from '@wordpress/components';
+import useProductEntityProp from '../../hooks/use-product-entity-prop';
+
+export function WarrantyEdit({ attributes, clientId }) {
+  const blockProps = useWooBlockProps(attributes);
+  
+  const [warrantyDuration, setWarrantyDuration] = useProductEntityProp(
+    'meta_data._warranty_duration'
+  );
+  
+  const [warrantyType, setWarrantyType] = useProductEntityProp(
+    'meta_data._warranty_type'
+  );
+
+  return (
+    <div {...blockProps}>
+      <BaseControl
+        label={__('Warranty Information', 'warranty-info')}
+        help={__('Configure the warranty for this product', 'warranty-info')}
+      >
+        <SelectControl
+          label={__('Warranty Type', 'warranty-info')}
+          value={warrantyType || 'limited'}
+          onChange={setWarrantyType}
+          options={[
+            { label: __('Limited Warranty', 'warranty-info'), value: 'limited' },
+            { label: __('Full Warranty', 'warranty-info'), value: 'full' },
+            { label: __('Extended Warranty', 'warranty-info'), value: 'extended' },
+            { label: __('No Warranty', 'warranty-info'), value: 'none' },
+          ]}
+        />
+        
+        {warrantyType !== 'none' && (
+          <NumberControl
+            label={__('Duration (months)', 'warranty-info')}
+            value={warrantyDuration || 12}
+            onChange={setWarrantyDuration}
+            min={1}
+            max={120}
+          />
+        )}
+      </BaseControl>
+    </div>
+  );
+}
+```
+
+### Register Custom Meta
+
+```php
+add_action('init', function() {
+  register_post_meta('product', '_warranty_duration', [
+    'type' => 'number',
+    'description' => 'Warranty duration in months',
+    'single' => true,
+    'show_in_rest' => true,
+    'default' => 12,
+  ]);
+  
+  register_post_meta('product', '_warranty_type', [
+    'type' => 'string',
+    'description' => 'Type of warranty',
+    'single' => true,
+    'show_in_rest' => true,
+    'default' => 'limited',
+  ]);
+});
+```
+
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Getting Started" icon="rocket" href="/blocks/getting-started">
+    Review block fundamentals and architecture
+  </Card>
+  <Card title="Extensible Blocks" icon="plug" href="/blocks/extensible-blocks">
+    Deep dive into filters and Slot Fills
+  </Card>
+  <Card title="Store API" icon="code" href="/apis/store-api">
+    Extend REST API endpoints
+  </Card>
+  <Card title="Payment Methods" icon="credit-card" href="/blocks/payment-methods">
+    Build custom payment integrations
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [WooCommerce Blocks Repository](https://github.com/woocommerce/woocommerce/tree/trunk/plugins/woocommerce/client/blocks)
+- [WordPress Block Editor Handbook](https://developer.wordpress.org/block-editor/)
+- [WooCommerce Storybook](https://woocommerce.github.io/woocommerce/)
+- [@woocommerce/extend-cart-checkout-block](https://github.com/woocommerce/woocommerce/tree/trunk/packages/js/extend-cart-checkout-block)

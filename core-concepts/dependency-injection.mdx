@@ -1,0 +1,661 @@
+---
+title: Dependency Injection
+description: Using WooCommerce's dependency injection container in modern code
+---
+
+WooCommerce uses a PSR-11 compliant dependency injection (DI) container to manage class dependencies and improve code testability.
+
+## Why Dependency Injection?
+
+Dependency injection provides several benefits over traditional singleton and global access patterns:
+
+- **Testability**: Easy to mock dependencies in unit tests
+- **Maintainability**: Clear dependencies make code easier to understand
+- **Flexibility**: Swap implementations without changing dependent code
+- **Single Responsibility**: Classes focus on their core purpose, not dependency management
+
+## The Container
+
+WooCommerce's container is available globally via the `wc_get_container()` function.
+
+### Container Setup
+
+The container is initialized in the main plugin file:
+
+```php plugins/woocommerce/woocommerce.php
+// Initialize dependency injection
+$GLOBALS['wc_container'] = new Automattic\WooCommerce\Container();
+
+/**
+ * Returns the WooCommerce object container.
+ *
+ * @since  4.4.0
+ * @return \Automattic\WooCommerce\Container The WooCommerce object container.
+ */
+function wc_get_container() {
+    return $GLOBALS['wc_container'];
+}
+```
+
+### Container Implementation
+
+The container is a PSR-11 compliant implementation:
+
+```php src/Container.php
+namespace Automattic\WooCommerce;
+
+use Automattic\WooCommerce\Internal\DependencyManagement\ContainerException;
+use Automattic\WooCommerce\Internal\DependencyManagement\RuntimeContainer;
+
+/**
+ * PSR11 compliant dependency injection container for WooCommerce.
+ *
+ * Classes in the `src` directory should specify dependencies from that directory 
+ * via an 'init' method having arguments with type hints.
+ */
+final class Container {
+    /**
+     * Returns an instance of the specified class.
+     *
+     * @template T of object
+     * @param string $id Class name.
+     * @phpstan-param class-string<T> $id
+     *
+     * @return T Object instance.
+     * @throws ContainerException Error when resolving the class.
+     */
+    public function get( string $id ) {
+        return $this->container->get( $id );
+    }
+
+    /**
+     * Returns true if the container can return an instance of the given class.
+     *
+     * @param class-string $id Class name.
+     * @return bool
+     */
+    public function has( string $id ): bool {
+        return $this->container->has( $id );
+    }
+}
+```
+
+## Getting Services
+
+Retrieve services from the container using the `get()` method.
+
+### From Legacy Code
+
+In `includes/` directory, use `wc_get_container()`:
+
+```php includes/class-woocommerce.php
+use Automattic\WooCommerce\Internal\AssignDefaultCategory;
+use Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController;
+
+// Get a service from the container
+$assign_category = wc_get_container()->get( AssignDefaultCategory::class );
+
+// Use the service
+$assign_category->schedule_action();
+```
+
+### From Modern Code
+
+In `src/` directory, inject dependencies via the `init()` method:
+
+```php src/Internal/MyClass.php
+namespace Automattic\WooCommerce\Internal;
+
+use Automattic\WooCommerce\Internal\Utilities\Users;
+use Automattic\WooCommerce\Proxies\LegacyProxy;
+
+class MyClass {
+    /**
+     * Dependencies injected by the container.
+     */
+    private Users $users;
+    private LegacyProxy $proxy;
+
+    /**
+     * Initialize with dependencies.
+     */
+    final public function init( Users $users, LegacyProxy $proxy ) {
+        $this->users = $users;
+        $this->proxy = $proxy;
+        
+        // Register hooks after dependencies are set
+        add_action( 'init', array( $this, 'setup' ) );
+    }
+    
+    public function setup() {
+        // Use injected dependencies
+        $current_user = $this->users->get_current_user();
+    }
+}
+```
+
+<Info>
+  The container automatically resolves dependencies when you type-hint them in the `init()` method.
+</Info>
+
+## The `init()` Method Pattern
+
+All classes in `src/` that require initialization should implement an `init()` method.
+
+### Basic Pattern
+
+```php
+namespace Automattic\WooCommerce\Internal;
+
+class BasicExample {
+    /**
+     * Class initialization, executed when resolved by the container.
+     *
+     * @internal
+     */
+    final public function init() {
+        add_action( 'init', array( $this, 'setup' ) );
+    }
+    
+    public function setup() {
+        // Initialization logic
+    }
+}
+```
+
+### With Dependencies
+
+```php
+namespace Automattic\WooCommerce\Internal;
+
+use Automattic\WooCommerce\Internal\Utilities\DatabaseUtil;
+use Automattic\WooCommerce\Proxies\LegacyProxy;
+
+class WithDependencies {
+    private DatabaseUtil $db;
+    private LegacyProxy $legacy;
+
+    /**
+     * Initialize with type-hinted dependencies.
+     */
+    final public function init( DatabaseUtil $db, LegacyProxy $legacy ) {
+        $this->db = $db;
+        $this->legacy = $legacy;
+        
+        add_action( 'admin_init', array( $this, 'admin_setup' ) );
+    }
+    
+    public function admin_setup() {
+        // Use $this->db and $this->legacy
+    }
+}
+```
+
+### With Container Access
+
+If you need the container itself:
+
+```php
+use Psr\Container\ContainerInterface;
+
+class NeedsContainer {
+    private ContainerInterface $container;
+
+    final public function init( ContainerInterface $container ) {
+        $this->container = $container;
+    }
+    
+    public function get_service() {
+        return $this->container->get( SomeService::class );
+    }
+}
+```
+
+## Container Patterns
+
+Common patterns for using the container effectively.
+
+### Automatic Resolution
+
+The container uses reflection to automatically resolve dependencies:
+
+```php src/Internal/DependencyManagement/RuntimeContainer.php
+private function instantiate_class_using_reflection( string $class_name, array &$resolve_chain ): object {
+    $ref_class = new \ReflectionClass( $class_name );
+
+    // Create instance with no-arg constructor
+    $instance = $ref_class->newInstance();
+    
+    if ( ! $ref_class->hasMethod( 'init' ) ) {
+        return $instance;
+    }
+
+    $init_method = $ref_class->getMethod( 'init' );
+    if ( ! $init_method->isPublic() || $init_method->isStatic() ) {
+        return $instance;
+    }
+
+    // Resolve init() method arguments
+    $init_args = $init_method->getParameters();
+    $init_arg_instances = array_map(
+        function ( \ReflectionParameter $arg ) use ( $class_name, &$resolve_chain ) {
+            $arg_type = $arg->getType();
+            
+            // Recursively resolve dependencies
+            return $this->get_core( $arg_type->getName(), $resolve_chain );
+        },
+        $init_args
+    );
+
+    // Call init() with resolved dependencies
+    $init_method->invoke( $instance, ...$init_arg_instances );
+
+    return $instance;
+}
+```
+
+### Singleton Behavior
+
+The container provides singleton behavior automatically:
+
+```php
+// First call: creates and caches instance
+$service1 = wc_get_container()->get( MyService::class );
+
+// Second call: returns cached instance
+$service2 = wc_get_container()->get( MyService::class );
+
+// $service1 === $service2 (same instance)
+```
+
+### Allowed Classes
+
+Only classes in the `Automattic\WooCommerce` namespace can be resolved:
+
+```php src/Internal/DependencyManagement/RuntimeContainer.php
+const WOOCOMMERCE_NAMESPACE = 'Automattic\\WooCommerce\\';
+
+protected function is_class_allowed( string $class_name ): bool {
+    return StringUtil::starts_with( $class_name, self::WOOCOMMERCE_NAMESPACE, false );
+}
+```
+
+<Warning>
+  Attempting to resolve classes outside the `Automattic\WooCommerce` namespace will throw a `ContainerException`.
+</Warning>
+
+### Circular Dependency Detection
+
+The container detects and prevents circular dependencies:
+
+```php
+if ( in_array( $class_name, $resolve_chain, true ) ) {
+    throw new ContainerException( 
+        "Recursive resolution of class '$class_name'. Resolution chain: " . 
+        implode( ', ', $resolve_chain ) 
+    );
+}
+```
+
+## Dependency Requirements
+
+Follow these rules when declaring dependencies in `init()` methods.
+
+### Valid Dependency Types
+
+<Tabs>
+  <Tab title="Class Dependencies">
+    Type-hint class dependencies:
+    
+    ```php
+    public function init( 
+        DatabaseUtil $db, 
+        LegacyProxy $proxy,
+        ContainerInterface $container
+    ) {
+        // Valid: all parameters are class types
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Invalid: Scalar Types">
+    Do NOT use scalar types:
+    
+    ```php
+    public function init( string $config, int $count ) {
+        // ERROR: Container cannot resolve scalar types
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Invalid: Arrays">
+    Do NOT use array types:
+    
+    ```php
+    public function init( array $options ) {
+        // ERROR: Container cannot resolve arrays
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Invalid: References">
+    Do NOT pass by reference:
+    
+    ```php
+    public function init( DatabaseUtil &$db ) {
+        // ERROR: Cannot pass by reference
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Constructor Requirements
+
+Classes resolved by the container must have either:
+
+1. **No constructor**, or
+2. **A public constructor with only optional parameters**
+
+```php
+// Valid: No constructor
+class ValidClass1 {
+    final public function init( SomeService $service ) { }
+}
+
+// Valid: Optional parameters only
+class ValidClass2 {
+    public function __construct( $optional_param = null ) { }
+    
+    final public function init( SomeService $service ) { }
+}
+
+// Invalid: Required constructor parameters
+class InvalidClass {
+    public function __construct( $required_param ) { } // ERROR
+    
+    final public function init( SomeService $service ) { }
+}
+```
+
+## Real-World Example
+
+Here's a complete example from WooCommerce core:
+
+```php src/Internal/AssignDefaultCategory.php
+<?php
+namespace Automattic\WooCommerce\Internal;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Class to assign default category to products.
+ */
+class AssignDefaultCategory {
+    /**
+     * Class initialization, to be executed when the class is resolved by the container.
+     *
+     * @internal
+     */
+    final public function init() {
+        add_action( 
+            'wc_schedule_update_product_default_cat', 
+            array( $this, 'maybe_assign_default_product_cat' ) 
+        );
+    }
+
+    /**
+     * Schedule action to assign default categories.
+     *
+     * @return void
+     */
+    public function schedule_action() {
+        WC()->queue()->schedule_single(
+            time(),
+            'wc_schedule_update_product_default_cat',
+            array(),
+            'wc_update_product_default_cat'
+        );
+    }
+
+    /**
+     * Assigns default product category for products that have no categories.
+     *
+     * @return void
+     */
+    public function maybe_assign_default_product_cat() {
+        global $wpdb;
+
+        $default_category = get_option( 'default_product_cat', 0 );
+
+        if ( $default_category ) {
+            $affected_rows = $wpdb->query(
+                $wpdb->prepare(
+                    "INSERT INTO {$wpdb->term_relationships} (object_id, term_taxonomy_id)
+                    SELECT DISTINCT posts.ID, %s FROM {$wpdb->posts} posts
+                    LEFT JOIN (
+                        SELECT object_id FROM {$wpdb->term_relationships} term_relationships
+                        LEFT JOIN {$wpdb->term_taxonomy} term_taxonomy 
+                        ON term_relationships.term_taxonomy_id = term_taxonomy.term_taxonomy_id
+                        WHERE term_taxonomy.taxonomy = 'product_cat'
+                    ) AS tax_query
+                    ON posts.ID = tax_query.object_id
+                    WHERE posts.post_type = 'product'
+                    AND tax_query.object_id IS NULL",
+                    $default_category
+                )
+            );
+            
+            if ( $affected_rows > 0 ) {
+                wp_cache_flush();
+                delete_transient( 'wc_term_counts' );
+                wp_update_term_count_now( array( $default_category ), 'product_cat' );
+            }
+        }
+    }
+}
+```
+
+## Common Patterns
+
+### Proxies for WordPress Functions
+
+Use proxies to interact with WordPress and legacy code:
+
+```php
+use Automattic\WooCommerce\Proxies\LegacyProxy;
+
+class MyFeature {
+    private LegacyProxy $legacy;
+
+    final public function init( LegacyProxy $legacy ) {
+        $this->legacy = $legacy;
+    }
+    
+    public function get_option( string $key ) {
+        // Use proxy instead of direct get_option() call
+        return $this->legacy->get_option( $key );
+    }
+}
+```
+
+### Multiple Dependencies
+
+Inject multiple services:
+
+```php
+use Automattic\WooCommerce\Internal\Utilities\DatabaseUtil;
+use Automattic\WooCommerce\Internal\Utilities\Users;
+use Automattic\WooCommerce\Utilities\LoggingUtil;
+
+class ComplexFeature {
+    private DatabaseUtil $db;
+    private Users $users;
+    private LoggingUtil $logger;
+
+    final public function init( 
+        DatabaseUtil $db, 
+        Users $users, 
+        LoggingUtil $logger 
+    ) {
+        $this->db = $db;
+        $this->users = $users;
+        $this->logger = $logger;
+    }
+}
+```
+
+### Optional Container Access
+
+Some classes may need the container for lazy loading:
+
+```php
+use Psr\Container\ContainerInterface;
+
+class LazyLoader {
+    private ContainerInterface $container;
+    private ?SomeService $service = null;
+
+    final public function init( ContainerInterface $container ) {
+        $this->container = $container;
+    }
+    
+    private function get_service(): SomeService {
+        if ( null === $this->service ) {
+            $this->service = $this->container->get( SomeService::class );
+        }
+        return $this->service;
+    }
+}
+```
+
+## Testing with the Container
+
+The container makes testing easier by allowing dependency mocking.
+
+### Unit Test Example
+
+```php tests/php/src/Internal/MyClassTest.php
+use Automattic\WooCommerce\Internal\MyClass;
+use Automattic\WooCommerce\Internal\Utilities\Users;
+
+class MyClassTest extends WC_Unit_Test_Case {
+    public function test_feature() {
+        // Create mock dependencies
+        $users_mock = $this->createMock( Users::class );
+        $users_mock->method( 'get_current_user' )
+            ->willReturn( 'test_user' );
+        
+        // Instantiate class and inject mocks
+        $my_class = new MyClass();
+        $my_class->init( $users_mock );
+        
+        // Test with mocked dependencies
+        $result = $my_class->some_method();
+        $this->assertEquals( 'expected', $result );
+    }
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Use init() Method">
+    Always inject dependencies via the `init()` method:
+    
+    ```php
+    final public function init( ServiceA $a, ServiceB $b ) {
+        $this->a = $a;
+        $this->b = $b;
+    }
+    ```
+  </Step>
+  
+  <Step title="Mark init() as Final">
+    Prevent overriding the init method:
+    
+    ```php
+    final public function init() { }
+    ```
+  </Step>
+  
+  <Step title="Type-Hint Dependencies">
+    Always use type hints for clarity and automatic resolution:
+    
+    ```php
+    public function init( DatabaseUtil $db ) { } // Good
+    public function init( $db ) { } // Bad
+    ```
+  </Step>
+  
+  <Step title="Store Dependencies as Properties">
+    Save injected dependencies for later use:
+    
+    ```php
+    private DatabaseUtil $db;
+    
+    final public function init( DatabaseUtil $db ) {
+        $this->db = $db; // Store for later use
+    }
+    ```
+  </Step>
+  
+  <Step title="Use Proxies for WordPress">
+    Don't call WordPress functions directly; use proxies:
+    
+    ```php
+    // Good
+    $this->legacy->get_option( 'key' );
+    
+    // Bad
+    get_option( 'key' );
+    ```
+  </Step>
+  
+  <Step title="Register Hooks in init()">
+    Add all hooks inside the init method:
+    
+    ```php
+    final public function init() {
+        add_action( 'init', array( $this, 'setup' ) );
+    }
+    ```
+  </Step>
+</Steps>
+
+## Error Handling
+
+The container throws `ContainerException` for various errors:
+
+### Class Not Found
+
+```php
+// Throws: Attempt to get an instance of class 'NonExistent', which doesn't exist.
+$service = wc_get_container()->get( 'NonExistent' );
+```
+
+### Outside Namespace
+
+```php
+// Throws: Class 'SomeClass' is not in the Automattic\WooCommerce namespace
+$service = wc_get_container()->get( SomeClass::class );
+```
+
+### Circular Dependency
+
+```php
+// If ClassA depends on ClassB and ClassB depends on ClassA:
+// Throws: Recursive resolution of class 'ClassA'
+$service = wc_get_container()->get( ClassA::class );
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Modern vs Legacy" icon="code-compare" href="/core-concepts/modern-vs-legacy">
+    Understand when to use dependency injection
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/core-concepts/architecture">
+    Learn about WooCommerce's overall architecture
+  </Card>
+</CardGroup>

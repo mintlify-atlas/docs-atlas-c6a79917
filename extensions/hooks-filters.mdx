@@ -1,0 +1,722 @@
+---
+title: WooCommerce hooks and filters
+description: Comprehensive guide to using WooCommerce actions and filters for customization with real examples from the codebase
+---
+
+# WooCommerce hooks and filters
+
+WooCommerce provides hundreds of actions (hooks) and filters that allow you to modify and extend its functionality without editing core files. This guide covers the most important hooks and how to use them effectively.
+
+## Understanding hooks and filters
+
+### Actions (Hooks)
+
+Actions allow you to execute custom code at specific points in WooCommerce's execution. They don't return values.
+
+```php
+// Example: Add custom content after the product title
+add_action( 'woocommerce_single_product_summary', 'add_custom_product_content', 6 );
+
+function add_custom_product_content() {
+    echo '<div class="custom-content">Custom content here</div>';
+}
+```
+
+### Filters
+
+Filters allow you to modify data before it's used or displayed. They always return a value.
+
+```php
+// Example: Modify the product price
+add_filter( 'woocommerce_product_get_price', 'modify_product_price', 10, 2 );
+
+function modify_product_price( $price, $product ) {
+    // Add 10% markup
+    return $price * 1.1;
+}
+```
+
+## Product hooks
+
+### Product loop hooks
+
+These hooks fire within the product loop on shop and archive pages.
+
+```php
+// Before the product loop
+add_action( 'woocommerce_before_shop_loop', 'custom_before_shop_loop' );
+
+function custom_before_shop_loop() {
+    echo '<div class="custom-message">Special offer!</div>';
+}
+
+// After the product loop
+add_action( 'woocommerce_after_shop_loop', 'custom_after_shop_loop' );
+
+function custom_after_shop_loop() {
+    echo '<div class="custom-footer">View all products</div>';
+}
+
+// Individual product in loop
+add_action( 'woocommerce_before_shop_loop_item_title', 'add_product_badge', 10 );
+
+function add_product_badge() {
+    global $product;
+    if ( $product->is_on_sale() ) {
+        echo '<span class="sale-badge">Sale!</span>';
+    }
+}
+```
+
+From `wc-template-hooks.php:83-85`:
+
+```php
+add_action( 'woocommerce_before_shop_loop', 'woocommerce_result_count', 20 );
+add_action( 'woocommerce_before_shop_loop', 'woocommerce_catalog_ordering', 30 );
+add_action( 'woocommerce_no_products_found', 'wc_no_products_found' );
+```
+
+### Single product page hooks
+
+Customize individual product pages:
+
+```php
+// Add content before product summary
+add_action( 'woocommerce_before_single_product_summary', 'add_product_notice', 5 );
+
+function add_product_notice() {
+    echo '<div class="product-notice">Limited time offer</div>';
+}
+
+// Modify product title
+add_filter( 'the_title', 'modify_product_title', 10, 2 );
+
+function modify_product_title( $title, $id ) {
+    if ( is_product() && in_the_loop() ) {
+        $product = wc_get_product( $id );
+        if ( $product && $product->is_on_sale() ) {
+            $title .= ' - ON SALE';
+        }
+    }
+    return $title;
+}
+```
+
+From `wc-template-hooks.php:39-40`:
+
+```php
+add_action( 'woocommerce_before_shop_loop_item_title', 'woocommerce_show_product_loop_sale_flash', 10 );
+add_action( 'woocommerce_before_single_product_summary', 'woocommerce_show_product_sale_flash', 10 );
+```
+
+### Product price filters
+
+```php
+// Modify displayed price
+add_filter( 'woocommerce_product_get_price', 'custom_product_price', 10, 2 );
+
+function custom_product_price( $price, $product ) {
+    // Check if user is logged in
+    if ( is_user_logged_in() ) {
+        // Give 10% discount to logged-in users
+        $price = $price * 0.9;
+    }
+    return $price;
+}
+
+// Modify sale price
+add_filter( 'woocommerce_product_get_sale_price', 'custom_sale_price', 10, 2 );
+
+function custom_sale_price( $sale_price, $product ) {
+    // Your custom logic
+    return $sale_price;
+}
+```
+
+### Product data filters
+
+```php
+// Filter product terms (categories, tags)
+add_filter( 'woocommerce_get_product_terms', 'modify_product_terms', 10, 4 );
+
+function modify_product_terms( $terms, $product_id, $taxonomy, $args ) {
+    // Modify or filter terms as needed
+    return $terms;
+}
+```
+
+From `wc-term-functions.php:183`:
+
+```php
+return apply_filters( 'woocommerce_get_product_terms', _wc_get_cached_product_terms( $product_id, $taxonomy, $args ), $product_id, $taxonomy, $args );
+```
+
+## Cart hooks
+
+### Cart item hooks
+
+```php
+// Modify item name in cart
+add_filter( 'woocommerce_cart_item_name', 'custom_cart_item_name', 10, 3 );
+
+function custom_cart_item_name( $name, $cart_item, $cart_item_key ) {
+    $product = $cart_item['data'];
+    if ( $product->is_on_sale() ) {
+        $name .= ' <span class="sale-tag">SALE</span>';
+    }
+    return $name;
+}
+
+// Modify cart item price
+add_filter( 'woocommerce_cart_item_price', 'custom_cart_item_price', 10, 3 );
+
+function custom_cart_item_price( $price, $cart_item, $cart_item_key ) {
+    // Your custom price display
+    return $price;
+}
+```
+
+### Cart total hooks
+
+```php
+// Add custom fees to cart
+add_action( 'woocommerce_cart_calculate_fees', 'add_custom_fee' );
+
+function add_custom_fee( $cart ) {
+    if ( is_admin() && ! defined( 'DOING_AJAX' ) ) {
+        return;
+    }
+    
+    $cart_total = $cart->get_subtotal();
+    
+    if ( $cart_total < 50 ) {
+        $cart->add_fee( __( 'Small order fee', 'woocommerce-myextension' ), 5 );
+    }
+}
+```
+
+## Checkout hooks
+
+### Checkout fields
+
+```php
+// Add custom checkout field
+add_filter( 'woocommerce_checkout_fields', 'add_custom_checkout_field' );
+
+function add_custom_checkout_field( $fields ) {
+    $fields['billing']['billing_company_vat'] = array(
+        'type'        => 'text',
+        'label'       => __( 'VAT Number', 'woocommerce-myextension' ),
+        'placeholder' => __( 'Enter your VAT number', 'woocommerce-myextension' ),
+        'required'    => false,
+        'class'       => array( 'form-row-wide' ),
+        'clear'       => true,
+    );
+    return $fields;
+}
+
+// Validate custom field
+add_action( 'woocommerce_checkout_process', 'validate_custom_checkout_field' );
+
+function validate_custom_checkout_field() {
+    if ( isset( $_POST['billing_company_vat'] ) && ! empty( $_POST['billing_company'] ) ) {
+        $vat = sanitize_text_field( $_POST['billing_company_vat'] );
+        
+        if ( empty( $vat ) ) {
+            wc_add_notice( 
+                __( 'Please enter a VAT number for your company.', 'woocommerce-myextension' ), 
+                'error' 
+            );
+        }
+    }
+}
+
+// Save custom field
+add_action( 'woocommerce_checkout_update_order_meta', 'save_custom_checkout_field' );
+
+function save_custom_checkout_field( $order_id ) {
+    if ( isset( $_POST['billing_company_vat'] ) ) {
+        update_post_meta( 
+            $order_id, 
+            '_billing_company_vat', 
+            sanitize_text_field( $_POST['billing_company_vat'] ) 
+        );
+    }
+}
+```
+
+### Checkout process hooks
+
+```php
+// Before checkout form
+add_action( 'woocommerce_before_checkout_form', 'add_checkout_notice', 10 );
+
+function add_checkout_notice() {
+    wc_print_notice( __( 'Free shipping on orders over $50!', 'woocommerce-myextension' ), 'notice' );
+}
+
+// After order is created
+add_action( 'woocommerce_checkout_order_processed', 'custom_order_processing', 10, 3 );
+
+function custom_order_processing( $order_id, $posted_data, $order ) {
+    // Send notification to external system
+    // Log order data
+    // Update inventory in external system
+}
+```
+
+## Order hooks
+
+### Order status changes
+
+```php
+// When order status changes to processing
+add_action( 'woocommerce_order_status_processing', 'order_processing_notification', 10, 2 );
+
+function order_processing_notification( $order_id, $order ) {
+    // Send custom notification
+    $customer_email = $order->get_billing_email();
+    // Send email or SMS notification
+}
+
+// When order is completed
+add_action( 'woocommerce_order_status_completed', 'order_completed_actions', 10, 2 );
+
+function order_completed_actions( $order_id, $order ) {
+    // Award loyalty points
+    // Send thank you email
+    // Update external CRM
+}
+
+// When order status changes (any status)
+add_action( 'woocommerce_order_status_changed', 'track_order_status_change', 10, 4 );
+
+function track_order_status_change( $order_id, $old_status, $new_status, $order ) {
+    // Log status change
+    error_log( sprintf( 'Order #%d status changed from %s to %s', $order_id, $old_status, $new_status ) );
+}
+```
+
+### Order item hooks
+
+```php
+// Modify order item meta
+add_filter( 'woocommerce_order_item_meta_start', 'add_order_item_custom_meta', 10, 3 );
+
+function add_order_item_custom_meta( $item_id, $item, $order ) {
+    $custom_data = $item->get_meta( '_custom_data' );
+    if ( $custom_data ) {
+        echo '<p class="custom-meta"><strong>' . __( 'Custom Data', 'woocommerce-myextension' ) . ':</strong> ' . esc_html( $custom_data ) . '</p>';
+    }
+}
+```
+
+## User and customer hooks
+
+### User registration
+
+```php
+// Before registration form submission
+add_action( 'woocommerce_register_post', 'validate_custom_registration_fields', 10, 3 );
+
+function validate_custom_registration_fields( $username, $email, $errors ) {
+    if ( isset( $_POST['custom_field'] ) && empty( $_POST['custom_field'] ) ) {
+        $errors->add( 'custom_field_error', __( 'Custom field is required.', 'woocommerce-myextension' ) );
+    }
+}
+```
+
+From `wc-user-functions.php:117`:
+
+```php
+do_action( 'woocommerce_register_post', $username, $email, $errors );
+```
+
+### Customer created
+
+```php
+// After customer is created
+add_action( 'woocommerce_created_customer', 'custom_customer_created_actions', 10, 3 );
+
+function custom_customer_created_actions( $customer_id, $new_customer_data, $password_generated ) {
+    // Send welcome email
+    // Add to external CRM
+    // Award signup bonus
+    
+    if ( $password_generated ) {
+        // Password was auto-generated
+        update_user_meta( $customer_id, '_password_generated', 'yes' );
+    }
+}
+```
+
+From `wc-user-functions.php:198`:
+
+```php
+do_action( 'woocommerce_created_customer', $customer_id, $new_customer_data, $password_generated );
+```
+
+## Email hooks
+
+### Email content
+
+```php
+// Add content before email footer
+add_action( 'woocommerce_email_before_order_table', 'add_custom_email_content', 10, 4 );
+
+function add_custom_email_content( $order, $sent_to_admin, $plain_text, $email ) {
+    if ( 'customer_completed_order' === $email->id ) {
+        echo '<p>' . __( 'Thank you for your purchase! Here\'s a discount code for your next order: THANKS10', 'woocommerce-myextension' ) . '</p>';
+    }
+}
+
+// Modify email subject
+add_filter( 'woocommerce_email_subject_customer_completed_order', 'custom_email_subject', 10, 2 );
+
+function custom_email_subject( $subject, $order ) {
+    $subject = sprintf( __( 'Your order %s is complete - Special offer inside!', 'woocommerce-myextension' ), $order->get_order_number() );
+    return $subject;
+}
+```
+
+## Template hooks
+
+### Shop page hooks
+
+```php
+// Archive page description
+add_action( 'woocommerce_archive_description', 'custom_archive_description' );
+
+function custom_archive_description() {
+    if ( is_shop() ) {
+        echo '<div class="custom-shop-notice">Browse our latest products below!</div>';
+    }
+}
+```
+
+From `wc-template-hooks.php:69-70`:
+
+```php
+add_action( 'woocommerce_archive_description', 'woocommerce_taxonomy_archive_description', 10 );
+add_action( 'woocommerce_archive_description', 'woocommerce_product_archive_description', 10 );
+```
+
+### Content wrappers
+
+```php
+// Replace default content wrappers
+remove_action( 'woocommerce_before_main_content', 'woocommerce_output_content_wrapper', 10 );
+remove_action( 'woocommerce_after_main_content', 'woocommerce_output_content_wrapper_end', 10 );
+
+add_action( 'woocommerce_before_main_content', 'custom_content_wrapper_start', 10 );
+add_action( 'woocommerce_after_main_content', 'custom_content_wrapper_end', 10 );
+
+function custom_content_wrapper_start() {
+    echo '<div id="custom-wrapper" class="container">';
+}
+
+function custom_content_wrapper_end() {
+    echo '</div><!-- #custom-wrapper -->';
+}
+```
+
+From `wc-template-hooks.php:30-31`:
+
+```php
+add_action( 'woocommerce_before_main_content', 'woocommerce_output_content_wrapper', 10 );
+add_action( 'woocommerce_after_main_content', 'woocommerce_output_content_wrapper_end', 10 );
+```
+
+## Widget hooks
+
+### Widget filters
+
+```php
+// Modify product widget query
+add_filter( 'woocommerce_products_widget_query_args', 'custom_widget_query_args' );
+
+function custom_widget_query_args( $query_args ) {
+    // Only show products in stock
+    $query_args['meta_query'][] = array(
+        'key'     => '_stock_status',
+        'value'   => 'instock',
+        'compare' => '=',
+    );
+    return $query_args;
+}
+```
+
+From `wc-widget-products.php:177`:
+
+```php
+return new WP_Query( apply_filters( 'woocommerce_products_widget_query_args', $query_args ) );
+```
+
+## Admin hooks
+
+### Product admin
+
+```php
+// Add custom product data tab
+add_filter( 'woocommerce_product_data_tabs', 'add_custom_product_tab' );
+
+function add_custom_product_tab( $tabs ) {
+    $tabs['custom_tab'] = array(
+        'label'    => __( 'Custom Data', 'woocommerce-myextension' ),
+        'target'   => 'custom_product_data',
+        'class'    => array( 'show_if_simple', 'show_if_variable' ),
+        'priority' => 80,
+    );
+    return $tabs;
+}
+
+// Add custom product data panel
+add_action( 'woocommerce_product_data_panels', 'add_custom_product_data_panel' );
+
+function add_custom_product_data_panel() {
+    ?>
+    <div id="custom_product_data" class="panel woocommerce_options_panel">
+        <?php
+        woocommerce_wp_text_input( array(
+            'id'          => '_custom_field',
+            'label'       => __( 'Custom Field', 'woocommerce-myextension' ),
+            'placeholder' => '',
+            'desc_tip'    => true,
+            'description' => __( 'Enter custom data here.', 'woocommerce-myextension' ),
+        ) );
+        ?>
+    </div>
+    <?php
+}
+
+// Save custom product data
+add_action( 'woocommerce_process_product_meta', 'save_custom_product_data' );
+
+function save_custom_product_data( $post_id ) {
+    $custom_field = isset( $_POST['_custom_field'] ) ? sanitize_text_field( $_POST['_custom_field'] ) : '';
+    update_post_meta( $post_id, '_custom_field', $custom_field );
+}
+```
+
+## Hook naming conventions
+
+WooCommerce follows these naming conventions from the [WordPress documentation standards](https://make.wordpress.org/core/handbook/best-practices/inline-documentation-standards/php/#4-hooks-actions-and-filters):
+
+### Lifecycle hooks
+
+Come in pairs ('before' and 'after'):
+
+```php
+do_action( 'woocommerce_before_calculate_totals', $cart );
+// ... calculation logic ...
+do_action( 'woocommerce_after_calculate_totals', $cart );
+```
+
+### Escape hooks
+
+Allow short-circuiting of functions:
+
+```php
+$pre = apply_filters( 'pre_woocommerce_get_product', null, $product_id );
+if ( null !== $pre ) {
+    return $pre;
+}
+// ... continue with normal logic ...
+```
+
+## Best practices for using hooks
+
+<Note>
+Always use proper hook priorities to ensure your code runs in the correct order.
+</Note>
+
+### Priority and accepted arguments
+
+```php
+// Default priority is 10
+add_action( 'woocommerce_before_cart', 'my_function', 10 );
+
+// Run before default (lower number)
+add_action( 'woocommerce_before_cart', 'my_early_function', 5 );
+
+// Run after default (higher number)
+add_action( 'woocommerce_before_cart', 'my_late_function', 20 );
+
+// Specify number of accepted arguments
+add_filter( 'woocommerce_product_get_price', 'my_price_function', 10, 2 );
+
+function my_price_function( $price, $product ) {
+    // Both parameters are available
+    return $price;
+}
+```
+
+### Removing hooks
+
+```php
+// Remove an action
+remove_action( 'woocommerce_before_shop_loop', 'woocommerce_result_count', 20 );
+
+// Remove a filter
+remove_filter( 'woocommerce_product_get_price', 'my_price_function', 10 );
+
+// Remove a hook from a class method
+remove_action( 'woocommerce_checkout_order_processed', array( $class_instance, 'method_name' ), 10 );
+```
+
+<Warning>
+When removing hooks, make sure to use the exact same priority and function name/reference as when the hook was added.
+</Warning>
+
+### Conditional execution
+
+```php
+add_action( 'woocommerce_before_cart', 'my_conditional_function' );
+
+function my_conditional_function() {
+    // Only run for logged-in users
+    if ( ! is_user_logged_in() ) {
+        return;
+    }
+    
+    // Only run on certain days
+    if ( date( 'N' ) >= 6 ) { // Saturday or Sunday
+        wc_print_notice( __( 'Weekend special offers available!', 'woocommerce-myextension' ), 'notice' );
+    }
+}
+```
+
+### Always return filtered values
+
+```php
+// Good: Always return a value
+add_filter( 'woocommerce_product_get_price', 'modify_price', 10, 2 );
+
+function modify_price( $price, $product ) {
+    if ( some_condition() ) {
+        return $price * 1.1;
+    }
+    return $price; // Always return
+}
+
+// Bad: May not return a value
+add_filter( 'woocommerce_product_get_price', 'bad_modify_price', 10, 2 );
+
+function bad_modify_price( $price, $product ) {
+    if ( some_condition() ) {
+        return $price * 1.1;
+    }
+    // Missing return statement!
+}
+```
+
+## Finding available hooks
+
+To discover available hooks:
+
+1. **Search the WooCommerce codebase**: Look for `do_action()` and `apply_filters()` calls
+2. **Check template files**: Templates in `woocommerce/templates/` contain many hooks
+3. **Review documentation**: See the [WooCommerce hook reference](https://woocommerce.com/documentation/plugins/woocommerce/woocommerce-codex/)
+4. **Use developer tools**: Browser extensions and plugins can help identify hooks
+
+### Example: Finding hooks in template files
+
+From `woocommerce/templates/content-product.php`:
+
+```php
+do_action( 'woocommerce_before_shop_loop_item' );
+do_action( 'woocommerce_before_shop_loop_item_title' );
+do_action( 'woocommerce_shop_loop_item_title' );
+do_action( 'woocommerce_after_shop_loop_item_title' );
+do_action( 'woocommerce_after_shop_loop_item' );
+```
+
+## Common use cases
+
+### Add custom product badges
+
+```php
+add_action( 'woocommerce_before_shop_loop_item_title', 'add_custom_badges', 10 );
+
+function add_custom_badges() {
+    global $product;
+    
+    // New product badge (products added in last 30 days)
+    $created = strtotime( $product->get_date_created() );
+    if ( $created > strtotime( '-30 days' ) ) {
+        echo '<span class="badge badge-new">' . __( 'New', 'woocommerce-myextension' ) . '</span>';
+    }
+    
+    // Low stock badge
+    if ( $product->managing_stock() && $product->get_stock_quantity() <= 5 ) {
+        echo '<span class="badge badge-low-stock">' . __( 'Low Stock', 'woocommerce-myextension' ) . '</span>';
+    }
+}
+```
+
+### Customize email templates
+
+```php
+// Add custom content to order emails
+add_action( 'woocommerce_email_order_meta', 'add_order_email_instructions', 10, 4 );
+
+function add_order_email_instructions( $order, $sent_to_admin, $plain_text, $email ) {
+    // Only for customer emails
+    if ( $sent_to_admin ) {
+        return;
+    }
+    
+    // Add shipping instructions for specific shipping method
+    $shipping_methods = $order->get_shipping_methods();
+    foreach ( $shipping_methods as $shipping_method ) {
+        if ( 'local_pickup' === $shipping_method->get_method_id() ) {
+            echo '<h2>' . __( 'Pickup Instructions', 'woocommerce-myextension' ) . '</h2>';
+            echo '<p>' . __( 'Please bring a valid ID when picking up your order.', 'woocommerce-myextension' ) . '</p>';
+        }
+    }
+}
+```
+
+### Add custom order statuses
+
+```php
+// Register custom order status
+add_action( 'init', 'register_custom_order_status' );
+
+function register_custom_order_status() {
+    register_post_status( 'wc-awaiting-shipment', array(
+        'label'                     => __( 'Awaiting Shipment', 'woocommerce-myextension' ),
+        'public'                    => true,
+        'exclude_from_search'       => false,
+        'show_in_admin_all_list'    => true,
+        'show_in_admin_status_list' => true,
+        'label_count'               => _n_noop( 'Awaiting shipment <span class="count">(%s)</span>', 'Awaiting shipment <span class="count">(%s)</span>', 'woocommerce-myextension' ),
+    ) );
+}
+
+// Add to order statuses list
+add_filter( 'wc_order_statuses', 'add_custom_order_status' );
+
+function add_custom_order_status( $order_statuses ) {
+    $order_statuses['wc-awaiting-shipment'] = __( 'Awaiting Shipment', 'woocommerce-myextension' );
+    return $order_statuses;
+}
+```
+
+## Next steps
+
+Now that you understand WooCommerce hooks and filters:
+
+1. Review the [WooCommerce template structure](https://woocommerce.com/document/template-structure/)
+2. Study [extension development best practices](/docs/extensions/best-practices)
+3. Explore the [WooCommerce Code Reference](https://woocommerce.com/wc-apidocs/)
+4. Read the [WordPress Plugin Handbook on hooks](https://developer.wordpress.org/plugins/hooks/)
+5. Check out [real examples in the WooCommerce codebase](https://github.com/woocommerce/woocommerce)
+
+## Additional resources
+
+- [WooCommerce Hook Reference](https://woocommerce.com/documentation/plugins/woocommerce/woocommerce-codex/)
+- [WordPress Plugin API](https://codex.wordpress.org/Plugin_API)
+- [WooCommerce Visual Hook Guide](https://www.businessbloomer.com/woocommerce-visual-hook-guide-archiveshopcat-page/)
+- [Adding Actions and Filters](/docs/extensions/core-concepts/adding-actions-and-filters)
+- [WooCommerce GitHub - Template Hooks](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/wc-template-hooks.php)

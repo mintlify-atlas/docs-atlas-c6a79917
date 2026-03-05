@@ -1,0 +1,298 @@
+---
+title: Theme Development Overview
+description: Introduction to WooCommerce theme development, comparing classic and block themes, and understanding theme compatibility
+---
+
+# Theme Development Overview
+
+WooCommerce works seamlessly with WordPress themes, offering flexibility for both classic PHP-based themes and modern block themes. This guide introduces the fundamentals of WooCommerce theme development and helps you choose the right approach for your project.
+
+## Theme Types
+
+WooCommerce supports two distinct theme architectures, each with its own development paradigm:
+
+### Classic Themes
+
+Classic themes use PHP template files and hooks to render WooCommerce content. They've been the standard approach since WooCommerce's inception.
+
+**Key characteristics:**
+- PHP-based template files (`.php`)
+- Hook-driven customization system
+- Located in `yourtheme/woocommerce/` directory
+- Template overrides for custom layouts
+- Direct control over HTML markup
+
+**Best for:**
+- Existing WordPress sites with classic themes
+- Projects requiring deep PHP customization
+- Developers comfortable with WordPress template hierarchy
+- Themes that need backward compatibility
+
+### Block Themes
+
+Block themes leverage WordPress Full Site Editing (FSE) and use HTML-based block templates. Available since WordPress 5.9 and actively developed.
+
+**Key characteristics:**
+- HTML-based template files (`.html`)
+- Styled via `theme.json` (global styles)
+- Visual editing through Site Editor
+- Block-based composition
+- Modern CSS architecture
+
+**Best for:**
+- New projects starting with WordPress 6.0+
+- Visual, no-code customization requirements
+- Modern development workflows
+- Leveraging the WordPress block ecosystem
+
+## Theme Compatibility
+
+<Info>
+As of WooCommerce 3.3+, all WordPress themes receive automatic compatibility with WooCommerce, even without explicit theme support. Templates render inside content areas maintaining your theme's design.
+</Info>
+
+### Automatic Compatibility (No Theme Support)
+
+Non-WooCommerce themes automatically include:
+
+- **Product gallery features** - Zoom, lightbox, and slider enabled by default
+- **Basic template rendering** - Products and shop pages display in content areas
+- **Comments instead of reviews** - Standard WordPress comments unless reviews are explicitly enabled
+
+### Declaring Theme Support
+
+For advanced control, themes should declare WooCommerce support using `add_theme_support()`:
+
+```php
+function mytheme_add_woocommerce_support() {
+    add_theme_support( 'woocommerce' );
+}
+add_action( 'after_setup_theme', 'mytheme_add_woocommerce_support' );
+```
+
+<Warning>
+You **must** declare WooCommerce support if using custom template overrides. Without theme support, WooCommerce assumes the theme is incompatible and falls back to shortcode-based rendering.
+</Warning>
+
+### Advanced Theme Support Options
+
+Configure WooCommerce features when declaring support:
+
+```php
+function mytheme_add_woocommerce_support() {
+    add_theme_support( 'woocommerce', array(
+        'thumbnail_image_width' => 150,
+        'single_image_width'    => 300,
+        
+        'product_grid'          => array(
+            'default_rows'    => 3,
+            'min_rows'        => 2,
+            'max_rows'        => 8,
+            'default_columns' => 4,
+            'min_columns'     => 2,
+            'max_columns'     => 5,
+        ),
+    ) );
+}
+add_action( 'after_setup_theme', 'mytheme_add_woocommerce_support' );
+```
+
+**Configuration options:**
+- `thumbnail_image_width` - Product thumbnail width (shop pages)
+- `single_image_width` - Main product image width (single product)
+- `product_grid` - Default, minimum, and maximum columns/rows for shop display
+
+<Note>
+If image sizes aren't declared, users can configure them via **Customizer > WooCommerce > Product Images**.
+</Note>
+
+## Product Gallery Features
+
+WooCommerce includes an advanced product gallery with zoom, lightbox, and slider functionality using Flexslider, Photoswipe, and jQuery Zoom.
+
+### Enabling Gallery Features
+
+```php
+add_theme_support( 'wc-product-gallery-zoom' );
+add_theme_support( 'wc-product-gallery-lightbox' );
+add_theme_support( 'wc-product-gallery-slider' );
+```
+
+You can enable individual features selectively. Scripts only load for enabled features.
+
+### Disabling Gallery Features
+
+If your theme provides custom gallery functionality:
+
+```php
+remove_theme_support( 'wc-product-gallery-zoom' );
+remove_theme_support( 'wc-product-gallery-lightbox' );
+remove_theme_support( 'wc-product-gallery-slider' );
+```
+
+## Integration Methods
+
+WooCommerce offers three methods for integrating with themes:
+
+<Tabs>
+  <Tab title="Hooks (Recommended)">
+    The most flexible and upgrade-safe approach. Use hooks to inject theme markup around WooCommerce content.
+
+    ```php
+    // Remove default WooCommerce wrappers
+    remove_action( 'woocommerce_before_main_content', 'woocommerce_output_content_wrapper', 10 );
+    remove_action( 'woocommerce_after_main_content', 'woocommerce_output_content_wrapper_end', 10 );
+    
+    // Add your theme's wrappers
+    add_action( 'woocommerce_before_main_content', 'mytheme_wrapper_start', 10 );
+    add_action( 'woocommerce_after_main_content', 'mytheme_wrapper_end', 10 );
+    
+    function mytheme_wrapper_start() {
+        echo '<section id="main" class="site-main">';
+    }
+    
+    function mytheme_wrapper_end() {
+        echo '</section>';
+    }
+    ```
+
+    **Advantages:**
+    - Minimal maintenance on WooCommerce updates
+    - No template files to keep current
+    - Clean separation of concerns
+  </Tab>
+  
+  <Tab title="Template Overrides">
+    Copy WooCommerce templates to your theme and customize the markup directly.
+
+    ```
+    wp-content/plugins/woocommerce/templates/single-product.php
+    →
+    wp-content/themes/yourtheme/woocommerce/single-product.php
+    ```
+
+    **Advantages:**
+    - Complete control over HTML structure
+    - Direct template modifications
+    - Useful for significant layout changes
+
+    **Disadvantages:**
+    - Must update templates when WooCommerce core templates change
+    - Higher maintenance burden
+  </Tab>
+  
+  <Tab title="woocommerce.php">
+    Create a single catch-all template for all WooCommerce content.
+
+    ```php
+    <?php
+    /**
+     * Template Name: WooCommerce
+     * Handles all WooCommerce pages
+     */
+    
+    get_header(); ?>
+    
+    <div id="primary" class="content-area">
+        <main id="main" class="site-main">
+            <?php woocommerce_content(); ?>
+        </main>
+    </div>
+    
+    <?php
+    get_sidebar();
+    get_footer();
+    ```
+
+    **Advantages:**
+    - Simple, single-file solution
+    - Easy to implement
+
+    **Disadvantages:**
+    - One template handles all WooCommerce pages (shop, products, categories)
+    - Less granular control
+    - Cannot override `archive-product.php` when using this method
+  </Tab>
+</Tabs>
+
+<Warning>
+When creating `woocommerce.php` in your theme, you cannot override `archive-product.php` as `woocommerce.php` takes priority. This is intentional to prevent display conflicts.
+</Warning>
+
+## Template Structure
+
+WooCommerce templates reside in:
+
+```
+/wp-content/plugins/woocommerce/templates/
+├── archive-product.php          # Shop page
+├── single-product.php           # Product page
+├── taxonomy-product-cat.php     # Category archives
+├── taxonomy-product-tag.php     # Tag archives
+├── cart/                        # Cart templates
+├── checkout/                    # Checkout templates
+├── myaccount/                   # Account templates
+├── emails/                      # Email templates
+└── ...
+```
+
+**Override templates by copying to:**
+
+```
+/wp-content/themes/yourtheme/woocommerce/
+```
+
+Maintain the same file structure but remove the `/templates/` subdirectory.
+
+<Note>
+All templates contain hooks allowing content addition/modification without editing template files. This is the preferred customization method.
+</Note>
+
+## Choosing Your Approach
+
+<Steps>
+  <Step title="Assess Your Project">
+    - **New sites**: Consider block themes for modern development
+    - **Existing classic themes**: Continue with classic approach
+    - **Client requirements**: Visual editing favors block themes
+  </Step>
+  
+  <Step title="Evaluate Technical Requirements">
+    - **Deep PHP customization**: Classic themes
+    - **Visual customization**: Block themes
+    - **Hybrid needs**: Classic themes with Gutenberg blocks
+  </Step>
+  
+  <Step title="Plan Integration Method">
+    - **Minor styling**: Hooks only (recommended)
+    - **Structural changes**: Template overrides
+    - **Complete control**: Custom templates + hooks
+  </Step>
+  
+  <Step title="Declare Theme Support">
+    Add `add_theme_support()` calls to enable WooCommerce features
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Classic Theme Development" icon="php" href="/themes/classic-themes">
+    Learn PHP-based theme development with template files and hooks
+  </Card>
+  
+  <Card title="Block Theme Development" icon="cube" href="/themes/block-themes">
+    Explore FSE, block templates, and theme.json styling
+  </Card>
+  
+  <Card title="Theme Customization" icon="palette" href="/themes/customization">
+    CSS, hooks, child themes, and best practices
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [WooCommerce Template Structure](https://github.com/woocommerce/woocommerce/tree/trunk/plugins/woocommerce/templates)
+- [WordPress Theme Handbook](https://developer.wordpress.org/themes/)
+- [Block Theme Development Course](https://learn.wordpress.org/course/develop-your-first-low-code-block-theme/)
+- [Conditional Tags Reference](/themes/classic-themes#conditional-tags)

@@ -1,0 +1,590 @@
+---
+title: WooCommerce extension development best practices
+description: Essential best practices for developing high-quality WooCommerce extensions covering namespacing, performance, security, internationalization, and code quality
+---
+
+# WooCommerce extension development best practices
+
+Following these best practices will help you create high-quality, secure, and maintainable WooCommerce extensions that work well with other plugins and provide a great experience for merchants.
+
+## Core principles
+
+WooCommerce extensions should:
+
+- Adhere to all WordPress plugin coding standards and [best practice guidelines](https://developer.wordpress.org/plugins/plugin-basics/best-practices/)
+- Have a single core purpose and use WooCommerce features as much as possible
+- Not do anything malicious, illegal, or dishonest
+- Not subvert or override Marketplace connections in core
+- Adhere to WooCommerce [compatibility and interoperability guidelines](https://woocommerce.com/document/marketplace-overview/#section-9)
+
+## Plugin structure and naming
+
+### Main plugin file naming
+
+The main plugin file should adopt the name of the plugin directory.
+
+```
+plugin-name/
+└── plugin-name.php  ✓ Correct
+
+plugin-name/
+└── main.php  ✗ Incorrect
+```
+
+### Text domain
+
+The text domain should match your plugin directory name. Do not use underscores.
+
+```php
+// Directory: woocommerce-my-extension
+// Text domain: woocommerce-my-extension ✓ Correct
+
+load_plugin_textdomain(
+    'woocommerce-my-extension',
+    false,
+    dirname( plugin_basename( __FILE__ ) ) . '/languages'
+);
+
+// Text domain: woocommerce_my_extension ✗ Incorrect
+```
+
+## Namespacing and avoiding conflicts
+
+### Use unique prefixes
+
+Prefix all functions, classes, constants, and global variables with a unique identifier to avoid naming conflicts.
+
+```php
+// Good: Prefixed function names
+function wcme_process_order( $order_id ) {
+    // Function code
+}
+
+function wcme_get_custom_field() {
+    // Function code
+}
+
+// Bad: Generic function names
+function process_order( $order_id ) {  // ✗ May conflict
+    // Function code
+}
+```
+
+### Use namespaces for classes
+
+Use PHP namespaces to organize your code and prevent class name collisions.
+
+```php
+namespace MyCompany\WooCommerce\MyExtension;
+
+class Product_Handler {
+    // Class code
+}
+
+class Order_Manager {
+    // Class code
+}
+```
+
+### Prefix options and transients
+
+```php
+// Good: Prefixed option names
+add_option( 'wcme_settings', $settings );
+set_transient( 'wcme_product_cache', $data, HOUR_IN_SECONDS );
+
+// Bad: Generic option names
+add_option( 'settings', $settings );  // ✗ May conflict
+set_transient( 'cache', $data, HOUR_IN_SECONDS );  // ✗ May conflict
+```
+
+## Performance optimization
+
+### Avoid custom database tables
+
+Whenever possible, use WordPress post types, taxonomies, and options instead of creating custom database tables.
+
+```php
+// Good: Use WordPress post types
+register_post_type( 'wcme_custom_order', array(
+    'labels' => array(
+        'name' => __( 'Custom Orders', 'woocommerce-my-extension' ),
+    ),
+    'public' => false,
+    'show_ui' => true,
+    'supports' => array( 'title', 'custom-fields' ),
+) );
+
+// Use post meta for additional data
+update_post_meta( $post_id, '_wcme_custom_field', $value );
+```
+
+If you must create custom tables, see the [data storage primer](/docs/best-practices/data-management/data-storage) for guidance.
+
+### Use transients for caching
+
+Store expensive API calls or calculations in transients to improve performance.
+
+```php
+function wcme_get_api_data() {
+    // Try to get cached data
+    $data = get_transient( 'wcme_api_data' );
+    
+    if ( false === $data ) {
+        // Data not cached, fetch from API
+        $response = wp_remote_get( 'https://api.example.com/data' );
+        
+        if ( ! is_wp_error( $response ) ) {
+            $data = json_decode( wp_remote_retrieve_body( $response ), true );
+            
+            // Cache for 1 hour
+            set_transient( 'wcme_api_data', $data, HOUR_IN_SECONDS );
+        }
+    }
+    
+    return $data;
+}
+```
+
+### Load scripts conditionally
+
+Only enqueue scripts and styles where they're needed.
+
+```php
+function wcme_enqueue_admin_scripts( $hook ) {
+    // Only load on our settings page
+    if ( 'woocommerce_page_wcme-settings' !== $hook ) {
+        return;
+    }
+    
+    wp_enqueue_script(
+        'wcme-admin',
+        plugins_url( 'assets/js/admin.js', __FILE__ ),
+        array( 'jquery' ),
+        '1.0.0',
+        true
+    );
+}
+add_action( 'admin_enqueue_scripts', 'wcme_enqueue_admin_scripts' );
+```
+
+## Security best practices
+
+### Prevent direct file access
+
+Add this line to the top of all PHP files to prevent direct access.
+
+```php
+defined( 'ABSPATH' ) || exit;
+```
+
+Learn more about [preventing data leaks](/docs/best-practices/security/prevent-data-leaks).
+
+### Validate and sanitize input
+
+Always validate and sanitize user input.
+
+```php
+function wcme_save_settings() {
+    // Verify nonce
+    if ( ! isset( $_POST['wcme_nonce'] ) || ! wp_verify_nonce( $_POST['wcme_nonce'], 'wcme_save_settings' ) ) {
+        wp_die( __( 'Security check failed', 'woocommerce-my-extension' ) );
+    }
+    
+    // Check user capabilities
+    if ( ! current_user_can( 'manage_woocommerce' ) ) {
+        wp_die( __( 'Unauthorized', 'woocommerce-my-extension' ) );
+    }
+    
+    // Sanitize input
+    $email = isset( $_POST['email'] ) ? sanitize_email( $_POST['email'] ) : '';
+    $text = isset( $_POST['text'] ) ? sanitize_text_field( $_POST['text'] ) : '';
+    
+    // Validate
+    if ( ! is_email( $email ) ) {
+        wp_die( __( 'Invalid email address', 'woocommerce-my-extension' ) );
+    }
+    
+    // Save sanitized data
+    update_option( 'wcme_email', $email );
+    update_option( 'wcme_text', $text );
+}
+```
+
+### Escape output
+
+Always escape data when outputting to prevent XSS attacks.
+
+```php
+// Escape translated text
+echo esc_html__( 'Hello World', 'woocommerce-my-extension' );
+
+// Escape attributes
+echo '<input type="text" value="' . esc_attr( $value ) . '" />';
+
+// Escape URLs
+echo '<a href="' . esc_url( $url ) . '">Link</a>';
+
+// Escape HTML (when you need to allow some HTML)
+echo wp_kses_post( $content );
+```
+
+### Use nonces for forms
+
+Protect forms with nonces to prevent CSRF attacks.
+
+```php
+// Output nonce field in form
+<form method="post">
+    <?php wp_nonce_field( 'wcme_save_settings', 'wcme_nonce' ); ?>
+    <!-- Form fields -->
+    <input type="submit" value="Save" />
+</form>
+
+// Verify nonce when processing
+if ( ! isset( $_POST['wcme_nonce'] ) || ! wp_verify_nonce( $_POST['wcme_nonce'], 'wcme_save_settings' ) ) {
+    wp_die( __( 'Security check failed', 'woocommerce-my-extension' ) );
+}
+```
+
+## Internationalization (i18n)
+
+### Follow i18n guidelines
+
+Follow the [Internationalization for WordPress Developers](https://developer.wordpress.org/plugins/internationalization/) guidelines.
+
+### Use translation functions
+
+Wrap all user-facing strings in translation functions.
+
+```php
+// Simple translation
+echo esc_html__( 'Hello World', 'woocommerce-my-extension' );
+
+// Translation with echo
+esc_html_e( 'Settings saved', 'woocommerce-my-extension' );
+
+// Singular/plural
+printf(
+    esc_html( _n( '%d item', '%d items', $count, 'woocommerce-my-extension' ) ),
+    $count
+);
+
+// Context-specific translation
+echo esc_html_x( 'Read', 'past tense', 'woocommerce-my-extension' );
+```
+
+### Localization files
+
+All text strings should be in English (the WordPress default locale). If targeting a specific market, include appropriate translation files in your plugin package.
+
+Learn more at [Using Makepot to translate your plugin](https://developer.wordpress.org/plugins/internationalization/localization/).
+
+## Code quality and maintainability
+
+### Follow WordPress coding standards
+
+Adhere to [WordPress PHP coding standards](https://developer.wordpress.org/coding-standards/wordpress-coding-standards/php/).
+
+Key points:
+- Use tabs for indentation
+- Use Yoda conditions: `if ( true === $value )`
+- Use single quotes for strings unless interpolating variables
+- Always use braces for control structures
+- Follow WordPress naming conventions
+
+### Use PHPDoc comments
+
+Document functions and classes with [PHPDoc blocks](https://developer.wordpress.org/coding-standards/inline-documentation-standards/php/).
+
+```php
+/**
+ * Get custom product data
+ *
+ * Retrieves additional product data stored by the extension.
+ *
+ * @since 1.0.0
+ *
+ * @param int $product_id Product ID.
+ * @param string $key     Data key to retrieve.
+ * @return mixed Product data or false if not found.
+ */
+function wcme_get_product_data( $product_id, $key ) {
+    $product = wc_get_product( $product_id );
+    
+    if ( ! $product ) {
+        return false;
+    }
+    
+    return $product->get_meta( '_wcme_' . $key );
+}
+```
+
+### Avoid God Objects
+
+Break large classes and functions into smaller, focused pieces. See [God Objects](https://en.wikipedia.org/wiki/God_object) for more information.
+
+```php
+// Good: Small, focused classes
+class Product_Validator {
+    public function validate( $product_data ) {
+        // Validation logic only
+    }
+}
+
+class Product_Processor {
+    public function process( $product_data ) {
+        // Processing logic only
+    }
+}
+
+// Bad: One class doing too much
+class Product_Handler {  // ✗ Does everything
+    public function validate() { }
+    public function process() { }
+    public function save() { }
+    public function email() { }
+    public function render() { }
+}
+```
+
+### Separate business and presentation logic
+
+Keep your business logic separate from presentation code.
+
+```php
+// Good: Separate classes
+class Order_Calculator {
+    // Business logic: Calculate totals
+    public function calculate_total( $order ) {
+        // Calculation logic
+    }
+}
+
+class Order_Display {
+    // Presentation logic: Display order
+    public function render_order( $order ) {
+        // Display logic
+    }
+}
+```
+
+### Remove unused code
+
+With version control, there's no reason to leave commented-out code. Remove it.
+
+```php
+// Bad: Commented-out code
+function wcme_process_order( $order_id ) {
+    $order = wc_get_order( $order_id );
+    
+    // $old_status = $order->get_status();
+    // if ( 'pending' === $old_status ) {
+    //     $order->update_status( 'processing' );
+    // }
+    
+    $order->update_status( 'completed' );
+}
+
+// Good: Clean, current code only
+function wcme_process_order( $order_id ) {
+    $order = wc_get_order( $order_id );
+    $order->update_status( 'completed' );
+}
+```
+
+## External libraries and dependencies
+
+### Minimize external dependencies
+
+The use of entire external libraries is typically not recommended as this can open up the product to security vulnerabilities.
+
+If an external library is absolutely necessary:
+- Only include the strictly necessary parts
+- Use a WordPress-friendly version when available
+- Assume ownership and responsibility for the code
+- Keep libraries updated
+
+<Warning>
+Executing outside code within a plugin is not allowed. Using third-party CDNs for non-service-related JavaScript and CSS is prohibited.
+</Warning>
+
+### Example: Use WordPress versions
+
+```php
+// Good: Use WordPress bundled library
+wp_enqueue_script( 'jquery' );
+wp_enqueue_script( 'jquery-ui-datepicker' );
+
+// Bad: Load from external CDN
+wp_enqueue_script(
+    'jquery',
+    'https://cdn.example.com/jquery.min.js'  // ✗ Prohibited
+);
+```
+
+## Testing and quality assurance
+
+### Enable debugging during development
+
+Test your code with `WP_DEBUG` mode enabled.
+
+```php
+// In wp-config.php
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );
+define( 'WP_DEBUG_DISPLAY', false );
+```
+
+This will flag issues like undefined variables and deprecated functions.
+
+### Use the Quality Insights Toolkit
+
+Integrate the [Quality Insights Toolkit (QIT)](https://qit.woo.com/docs/) into your development workflow.
+
+The QIT allows you to test extensions against:
+- New releases of PHP, WooCommerce, and WordPress
+- Other active extensions
+- Different configurations
+
+Use the [CLI tool](https://qit.woo.com/docs/installation-setup/cli-installation) to run tests against development builds.
+
+### Implement logging
+
+Log data that can be useful for debugging, with two conditions:
+1. Make logging opt-in
+2. Use the [WC_Logger](https://woocommerce.com/wc-apidocs/class-WC_Logger.html) class
+
+```php
+function wcme_log( $message, $level = 'info' ) {
+    // Only log if debugging is enabled
+    if ( ! defined( 'WP_DEBUG' ) || ! WP_DEBUG ) {
+        return;
+    }
+    
+    $logger = wc_get_logger();
+    $context = array( 'source' => 'woocommerce-my-extension' );
+    
+    $logger->log( $level, $message, $context );
+}
+
+// Usage
+wcme_log( 'Order processed: ' . $order_id );
+wcme_log( 'API error: ' . $error_message, 'error' );
+```
+
+Learn how to [add a link to logged data](/docs/code-snippets/link-to-logged-data) in your extension.
+
+## WooCommerce-specific guidelines
+
+### Check if WooCommerce is active
+
+Most WooCommerce plugins do not need to run unless WooCommerce is already active.
+
+[Learn how to check if WooCommerce is active](/docs/extensions/core-concepts/check-if-woo-is-active).
+
+### Never use internal WooCommerce code
+
+<Warning>
+Classes in the `Automattic\WooCommerce\Internal` namespace and code marked with `@internal` annotations are for WooCommerce core use only. Backwards compatibility is not guaranteed.
+</Warning>
+
+Internal code may change, be renamed, or be removed in any future release. Using it in your extension may cause it to break when merchants update WooCommerce.
+
+See the [Internal namespace documentation](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/src/Internal/README.md) for details.
+
+### Make extensions extensible
+
+Use WordPress actions and filters to allow for modification and customization.
+
+```php
+function wcme_calculate_custom_fee( $order ) {
+    $fee_amount = 5.00;
+    
+    // Allow other plugins to modify the fee
+    $fee_amount = apply_filters( 'wcme_custom_fee_amount', $fee_amount, $order );
+    
+    return $fee_amount;
+}
+
+// Allow other plugins to hook in before processing
+do_action( 'wcme_before_process_order', $order );
+
+// Process order
+wcme_process_order( $order );
+
+// Allow other plugins to hook in after processing
+do_action( 'wcme_after_process_order', $order );
+```
+
+For more information, see [Writing Extensible Plugins with Actions and Filters](https://code.tutsplus.com/tutorials/writing-extensible-plugins-with-actions-and-filters--wp-26759).
+
+### Use template files
+
+If your plugin creates front-end output, use a templating engine so users can create custom template files in their theme's WooCommerce folder to overwrite the plugin's template files.
+
+```php
+function wcme_get_template( $template_name, $args = array() ) {
+    // Look in theme first
+    $template = locate_template( array(
+        'woocommerce-my-extension/' . $template_name,
+        $template_name,
+    ) );
+    
+    // Fall back to plugin template
+    if ( ! $template ) {
+        $template = plugin_dir_path( __FILE__ ) . 'templates/' . $template_name;
+    }
+    
+    // Extract args to variables
+    if ( $args && is_array( $args ) ) {
+        extract( $args );
+    }
+    
+    include $template;
+}
+```
+
+## Documentation requirements
+
+### README file
+
+All plugins need a [standard WordPress README](https://wordpress.org/plugins/readme.txt). See the [WordPress plugin README file standard](https://wordpress.org/plugins/readme.txt).
+
+### Changelog file
+
+All plugins need a changelog file. See the [changelog.txt documentation](/docs/extensions/core-concepts/changelog-txt).
+
+### Plugin header
+
+Follow the conventions in the [example WordPress plugin header comment](/docs/extensions/core-concepts/example-header-plugin-comment).
+
+## Summary checklist
+
+Before releasing your extension:
+
+- [ ] Plugin file and directory names match
+- [ ] Text domain matches directory name (no underscores)
+- [ ] All functions, classes, and options are properly prefixed
+- [ ] Direct file access is prevented in all PHP files
+- [ ] All user input is validated and sanitized
+- [ ] All output is properly escaped
+- [ ] All strings are internationalized
+- [ ] Code follows WordPress coding standards
+- [ ] Functions and classes have PHPDoc comments
+- [ ] No unused or commented-out code
+- [ ] Scripts and styles load only where needed
+- [ ] WooCommerce active check is in place
+- [ ] No internal WooCommerce code is used
+- [ ] Tested with WP_DEBUG enabled
+- [ ] Tested with Quality Insights Toolkit
+- [ ] README.txt and changelog.txt are complete
+- [ ] Plugin header is properly formatted
+
+## Additional resources
+
+- [WordPress Plugin Developer Handbook](https://developer.wordpress.org/plugins/)
+- [WordPress Coding Standards](https://developer.wordpress.org/coding-standards/)
+- [WooCommerce Code Reference](https://woocommerce.com/wc-apidocs/)
+- [Quality Insights Toolkit](https://qit.woo.com/docs/)
+- [WooCommerce Marketplace Guidelines](https://woocommerce.com/document/marketplace-overview/)

@@ -1,0 +1,512 @@
+---
+title: "Email System"
+description: "Customizing and extending WooCommerce's email notification system."
+---
+
+## Overview
+
+WooCommerce includes a comprehensive email notification system that automatically sends emails to customers and store administrators for various order events. The system is highly customizable through hooks, filters, and custom email classes.
+
+## Default WooCommerce Emails
+
+WooCommerce sends these emails by default:
+
+### Customer Emails
+
+<CardGroup cols={2}>
+  <Card title="New Order" icon="envelope">
+    Sent to customers when a new order is placed.
+  </Card>
+  <Card title="Processing Order" icon="gears">
+    Sent when order status changes to Processing.
+  </Card>
+  <Card title="Completed Order" icon="check">
+    Sent when order status changes to Completed.
+  </Card>
+  <Card title="Refunded Order" icon="rotate-left">
+    Sent when an order is refunded.
+  </Card>
+  <Card title="Cancelled Order" icon="xmark">
+    Sent when an order is cancelled.
+  </Card>
+  <Card title="Failed Order" icon="triangle-exclamation">
+    Sent when an order payment fails.
+  </Card>
+  <Card title="Customer Invoice" icon="file-invoice">
+    Manual invoice email that can be sent by admin.
+  </Card>
+  <Card title="Customer Note" icon="comment">
+    Sent when a customer note is added to an order.
+  </Card>
+  <Card title="Reset Password" icon="key">
+    Password reset email for customer accounts.
+  </Card>
+  <Card title="New Account" icon="user-plus">
+    Welcome email when a customer account is created.
+  </Card>
+</CardGroup>
+
+### Admin Emails
+
+- **New Order**: Notifies admin when new order is received
+- **Cancelled Order**: Notifies admin when order is cancelled
+- **Failed Order**: Notifies admin when order payment fails
+
+## Email Template Structure
+
+WooCommerce email templates follow this hierarchy:
+
+```
+plugins/woocommerce/templates/emails/
+├── admin-cancelled-order.php
+├── admin-failed-order.php
+├── admin-new-order.php
+├── customer-completed-order.php
+├── customer-invoice.php
+├── customer-new-account.php
+├── customer-note.php
+├── customer-processing-order.php
+├── customer-refunded-order.php
+├── customer-reset-password.php
+├── email-header.php              # Email header
+├── email-footer.php              # Email footer
+├── email-styles.php              # Inline CSS styles
+└── email-addresses.php           # Customer addresses
+```
+
+### Template Overrides
+
+Override email templates in your theme:
+
+<Steps>
+  <Step title="Create email directory in your theme">
+    ```bash
+    mkdir -p wp-content/themes/your-theme/woocommerce/emails/
+    ```
+  </Step>
+  
+  <Step title="Copy template file">
+    Copy the template from WooCommerce to your theme:
+    
+    ```bash
+    cp plugins/woocommerce/templates/emails/customer-completed-order.php \
+       themes/your-theme/woocommerce/emails/
+    ```
+  </Step>
+  
+  <Step title="Customize the template">
+    Edit the template in your theme directory. Your changes will override the default.
+  </Step>
+</Steps>
+
+<Warning>
+Always maintain the same directory structure. Template overrides in incorrect locations won't work.
+</Warning>
+
+## Customizing Email Content
+
+### Email Heading and Subject
+
+Customize email headings and subjects with filters:
+
+```php
+// Customize completed order email subject
+add_filter( 'woocommerce_email_subject_customer_completed_order', function( $subject, $order ) {
+    return sprintf( 'Your order #%s has been shipped!', $order->get_order_number() );
+}, 10, 2 );
+
+// Customize completed order email heading
+add_filter( 'woocommerce_email_heading_customer_completed_order', function( $heading, $order ) {
+    return 'Your order is on its way!';
+}, 10, 2 );
+
+// Customize new order email subject (admin)
+add_filter( 'woocommerce_email_subject_new_order', function( $subject, $order ) {
+    return sprintf( 'New order #%s - %s', $order->get_order_number(), $order->get_billing_email() );
+}, 10, 2 );
+```
+
+### Adding Custom Content
+
+Add content before or after various sections:
+
+```php
+// Add content before email header
+add_action( 'woocommerce_email_header', function( $email_heading, $email ) {
+    if ( $email->id === 'customer_completed_order' ) {
+        echo '<p style="text-align:center; font-weight:bold;">🎉 Thank you for your purchase!</p>';
+    }
+}, 10, 2 );
+
+// Add content after order details
+add_action( 'woocommerce_email_after_order_table', function( $order, $sent_to_admin, $plain_text, $email ) {
+    if ( $email->id === 'customer_processing_order' ) {
+        echo '<p>Your order will be processed within 24 hours.</p>';
+    }
+}, 10, 4 );
+
+// Add content before email footer
+add_action( 'woocommerce_email_footer', function( $email ) {
+    echo '<p>Follow us on social media: @yourstore</p>';
+} );
+```
+
+### Available Email Hooks
+
+<Accordion title="Email Hook Reference">
+  **Header Hooks:**
+  - `woocommerce_email_header` - Before email header
+  
+  **Body Hooks:**
+  - `woocommerce_email_before_order_table` - Before order details
+  - `woocommerce_email_after_order_table` - After order details
+  - `woocommerce_email_order_meta` - Order meta section
+  - `woocommerce_email_customer_details` - Customer details section
+  
+  **Footer Hooks:**
+  - `woocommerce_email_footer` - Before email footer
+  
+  **Product Hooks:**
+  - `woocommerce_order_item_name` - Product name in email
+  - `woocommerce_order_item_quantity_html` - Product quantity display
+</Accordion>
+
+## Styling Emails
+
+### Customizing Email Styles
+
+Email styles are defined inline for email client compatibility:
+
+```php
+// Customize email styles
+add_filter( 'woocommerce_email_styles', function( $css ) {
+    $css .= '
+        #template_header {
+            background-color: #843cfb !important;
+            border-bottom: 0 !important;
+        }
+        #template_header h1 {
+            color: #ffffff !important;
+        }
+        a {
+            color: #843cfb !important;
+        }
+    ';
+    return $css;
+} );
+```
+
+### Using Custom Email Template Colors
+
+Set custom colors in WooCommerce settings:
+
+```php
+// Programmatically set email template colors
+add_filter( 'woocommerce_email_background_color', function( $color ) {
+    return '#f5f5f5';
+} );
+
+add_filter( 'woocommerce_email_base_color', function( $color ) {
+    return '#843cfb';
+} );
+
+add_filter( 'woocommerce_email_body_background_color', function( $color ) {
+    return '#ffffff';
+} );
+
+add_filter( 'woocommerce_email_text_color', function( $color ) {
+    return '#333333';
+} );
+```
+
+## Creating Custom Emails
+
+Create a completely custom email class:
+
+<Steps>
+  <Step title="Create email class">
+    Create a new class extending `WC_Email`:
+    
+    ```php
+    class WC_Custom_Email extends WC_Email {
+        
+        public function __construct() {
+            $this->id             = 'custom_email';
+            $this->title          = 'Custom Email';
+            $this->description    = 'Custom email sent on specific trigger';
+            $this->template_html  = 'emails/custom-email.php';
+            $this->template_plain = 'emails/plain/custom-email.php';
+            $this->template_base  = plugin_dir_path( __FILE__ ) . 'templates/';
+            
+            // Triggers
+            add_action( 'your_custom_action', array( $this, 'trigger' ), 10, 2 );
+            
+            // Call parent constructor
+            parent::__construct();
+            
+            // Recipient defaults to admin
+            $this->recipient = $this->get_option( 'recipient', get_option( 'admin_email' ) );
+        }
+        
+        public function trigger( $order_id, $custom_data = null ) {
+            $this->setup_locale();
+            
+            if ( $order_id ) {
+                $this->object = wc_get_order( $order_id );
+                $this->custom_data = $custom_data;
+                
+                // Set recipient to customer email
+                $this->recipient = $this->object->get_billing_email();
+            }
+            
+            if ( $this->is_enabled() && $this->get_recipient() ) {
+                $this->send(
+                    $this->get_recipient(),
+                    $this->get_subject(),
+                    $this->get_content(),
+                    $this->get_headers(),
+                    $this->get_attachments()
+                );
+            }
+            
+            $this->restore_locale();
+        }
+        
+        public function get_content_html() {
+            return wc_get_template_html(
+                $this->template_html,
+                array(
+                    'order'         => $this->object,
+                    'custom_data'   => $this->custom_data,
+                    'email_heading' => $this->get_heading(),
+                    'sent_to_admin' => false,
+                    'plain_text'    => false,
+                    'email'         => $this,
+                ),
+                '',
+                $this->template_base
+            );
+        }
+        
+        public function get_content_plain() {
+            return wc_get_template_html(
+                $this->template_plain,
+                array(
+                    'order'         => $this->object,
+                    'custom_data'   => $this->custom_data,
+                    'email_heading' => $this->get_heading(),
+                    'sent_to_admin' => false,
+                    'plain_text'    => true,
+                    'email'         => $this,
+                ),
+                '',
+                $this->template_base
+            );
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Register email class">
+    Add your email to WooCommerce:
+    
+    ```php
+    add_filter( 'woocommerce_email_classes', function( $email_classes ) {
+        $email_classes['WC_Custom_Email'] = new WC_Custom_Email();
+        return $email_classes;
+    } );
+    ```
+  </Step>
+  
+  <Step title="Create email template">
+    Create `templates/emails/custom-email.php` in your plugin:
+    
+    ```php
+    <?php
+    /**
+     * Custom email template
+     */
+    if ( ! defined( 'ABSPATH' ) ) {
+        exit;
+    }
+    
+    do_action( 'woocommerce_email_header', $email_heading, $email );
+    ?>
+    
+    <p>Hello <?php echo esc_html( $order->get_billing_first_name() ); ?>,</p>
+    
+    <p>Your custom email content here.</p>
+    
+    <?php if ( $custom_data ) : ?>
+        <p>Custom data: <?php echo esc_html( $custom_data ); ?></p>
+    <?php endif; ?>
+    
+    <?php
+    do_action( 'woocommerce_email_order_details', $order, $sent_to_admin, $plain_text, $email );
+    do_action( 'woocommerce_email_order_meta', $order, $sent_to_admin, $plain_text, $email );
+    do_action( 'woocommerce_email_customer_details', $order, $sent_to_admin, $plain_text, $email );
+    do_action( 'woocommerce_email_footer', $email );
+    ```
+  </Step>
+  
+  <Step title="Trigger the email">
+    ```php
+    // Trigger your custom email
+    do_action( 'your_custom_action', $order_id, $custom_data );
+    ```
+  </Step>
+</Steps>
+
+## Testing Emails
+
+### Send Test Emails
+
+Manually trigger emails for testing:
+
+```php
+// Get all email classes
+$emails = WC()->mailer()->get_emails();
+
+// Send a specific email
+if ( isset( $emails['WC_Email_Customer_Completed_Order'] ) ) {
+    $emails['WC_Email_Customer_Completed_Order']->trigger( $order_id );
+}
+```
+
+### Email Preview
+
+Add email preview capability:
+
+```php
+// Add email preview query parameter
+add_action( 'template_redirect', function() {
+    if ( isset( $_GET['preview_email'] ) && current_user_can( 'manage_woocommerce' ) ) {
+        $order_id = isset( $_GET['order_id'] ) ? intval( $_GET['order_id'] ) : 0;
+        $order = wc_get_order( $order_id );
+        
+        if ( ! $order ) {
+            wp_die( 'Invalid order ID' );
+        }
+        
+        $emails = WC()->mailer()->get_emails();
+        $email_type = sanitize_key( $_GET['preview_email'] );
+        
+        if ( isset( $emails[ $email_type ] ) ) {
+            echo $emails[ $email_type ]->get_content_html();
+            exit;
+        }
+    }
+} );
+
+// Preview URL:
+// /wp-admin/?preview_email=WC_Email_Customer_Completed_Order&order_id=123
+```
+
+## Email Attachments
+
+Add attachments to emails:
+
+```php
+// Add PDF invoice to completed order email
+add_filter( 'woocommerce_email_attachments', function( $attachments, $email_id, $order ) {
+    if ( $email_id === 'customer_completed_order' ) {
+        $invoice_path = '/path/to/invoice-' . $order->get_id() . '.pdf';
+        
+        if ( file_exists( $invoice_path ) ) {
+            $attachments[] = $invoice_path;
+        }
+    }
+    
+    return $attachments;
+}, 10, 3 );
+```
+
+## Advanced Customization
+
+### Conditional Email Sending
+
+Prevent emails from sending based on conditions:
+
+```php
+// Prevent completed order email for free orders
+add_filter( 'woocommerce_email_enabled_customer_completed_order', function( $enabled, $order ) {
+    if ( $order->get_total() == 0 ) {
+        return false;
+    }
+    return $enabled;
+}, 10, 2 );
+```
+
+### Custom Email Recipients
+
+Add additional recipients:
+
+```php
+// Add BCC to new order emails
+add_filter( 'woocommerce_email_headers', function( $headers, $email_id, $order ) {
+    if ( $email_id === 'new_order' ) {
+        $headers .= "BCC: manager@example.com\r\n";
+    }
+    return $headers;
+}, 10, 3 );
+```
+
+## Email Settings
+
+Access email settings programmatically:
+
+```php
+// Get email object
+$emails = WC()->mailer()->get_emails();
+$completed_email = $emails['WC_Email_Customer_Completed_Order'];
+
+// Get settings
+$enabled = $completed_email->is_enabled();
+$subject = $completed_email->get_subject();
+$heading = $completed_email->get_heading();
+
+// Update settings
+$completed_email->update_option( 'subject', 'New subject line' );
+$completed_email->update_option( 'heading', 'New heading' );
+```
+
+## Troubleshooting
+
+<Accordion title="Emails not sending">
+  Check WordPress email configuration:
+  
+  ```php
+  // Test email sending
+  wp_mail( 'test@example.com', 'Test Subject', 'Test message' );
+  ```
+  
+  Consider using an SMTP plugin like WP Mail SMTP or Post SMTP.
+</Accordion>
+
+<Accordion title="Email styling broken">
+  Ensure CSS is inline (email clients strip `<style>` tags):
+  
+  ```php
+  // Use inline styles
+  echo '<p style="color: #333; font-size: 16px;">Content</p>';
+  ```
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Template Overrides"
+    icon="file-code"
+    href="/themes/classic-themes"
+  >
+    Learn about template customization
+  </Card>
+  <Card
+    title="Hooks and Filters"
+    icon="filter"
+    href="/extensions/hooks-filters"
+  >
+    Master WooCommerce hooks
+  </Card>
+</CardGroup>

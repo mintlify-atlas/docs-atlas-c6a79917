@@ -1,0 +1,586 @@
+---
+title: Testing Requirements
+description: Testing requirements for WooCommerce including PHPUnit, Jest, Playwright E2E tests, and commands for running tests
+---
+
+Testing is a critical part of the WooCommerce development process. All code contributions should include appropriate tests, and existing tests must pass before changes can be merged.
+
+## Testing Overview
+
+WooCommerce uses multiple testing frameworks to ensure code quality:
+
+<CardGroup cols={3}>
+  <Card title="PHPUnit" icon="php">
+    Unit and integration tests for PHP code
+  </Card>
+  <Card title="Jest" icon="js">
+    Unit tests for JavaScript and React components
+  </Card>
+  <Card title="Playwright" icon="browser">
+    End-to-end and API testing
+  </Card>
+</CardGroup>
+
+## Test Environment Setup
+
+WooCommerce uses `@wordpress/env` (wp-env) to create isolated Docker-based testing environments.
+
+### Prerequisites
+
+- [Docker](https://www.docker.com/) installed and running
+- PNPM installed
+- Sufficient disk space for Docker containers
+
+### Environment Commands
+
+Run these commands from `plugins/woocommerce` directory:
+
+```bash
+# Start the test environment (creates if necessary)
+pnpm env:start
+
+# Start and update the environment
+pnpm env:dev
+
+# Stop the environment
+pnpm env:stop
+
+# Destroy the environment (removes all files)
+pnpm env:destroy
+
+# Restart the environment (destroy and start)
+pnpm env:restart
+```
+
+<Info>
+  Each plugin in the monorepo has its own isolated environment to prevent conflicts.
+</Info>
+
+### Environment Details
+
+- **PHP Version**: 8.1 (default), configurable per test
+- **WordPress**: Latest version (default), configurable
+- **PHPUnit**: Version 9.6.24
+- **URL**: http://localhost:8888 (default)
+- **Admin**: http://localhost:8888/wp-admin (username: `admin`, password: `password`)
+
+## PHPUnit Tests
+
+PHPUnit tests validate PHP code functionality, including classes, functions, and WordPress integration.
+
+### Running PHPUnit Tests
+
+<Tabs>
+  <Tab title="Local (without Docker)">
+    ```bash
+    # Run all PHP unit tests
+    pnpm test:php
+    
+    # Run with HPOS disabled
+    pnpm test:php:hpos-off
+    
+    # Watch mode (auto-run on changes)
+    pnpm test:php:watch
+    ```
+  </Tab>
+  
+  <Tab title="Docker Environment">
+    ```bash
+    # Run all tests in wp-env
+    pnpm test:php:env
+    
+    # Run with HPOS disabled
+    pnpm test:php:env:hpos-off
+    
+    # Watch mode in environment
+    pnpm test:php:env:watch
+    ```
+  </Tab>
+  
+  <Tab title="Specific Tests">
+    ```bash
+    # Run specific test class
+    pnpm test:php:env -- --filter TestClassName
+    
+    # Run specific test method
+    pnpm test:php:env -- --filter TestClassName::test_method_name
+    
+    # Run specific test suite
+    ./vendor/bin/phpunit --testsuite=wc-phpunit-main
+    ./vendor/bin/phpunit --testsuite=wc-phpunit-legacy
+    ```
+  </Tab>
+</Tabs>
+
+### PHPUnit Test Structure
+
+Tests are organized to mirror the source code structure:
+
+```text
+plugins/woocommerce/
+├── src/                      # Modern PHP code
+│   └── Internal/
+│       └── Admin/
+│           └── Orders.php
+├── includes/                 # Legacy PHP code
+│   └── class-wc-order.php
+└── tests/php/
+    ├── src/                  # Tests for modern code
+    │   └── Internal/
+    │       └── Admin/
+    │           └── OrdersTest.php
+    └── includes/             # Tests for legacy code
+        └── class-wc-order-test.php
+```
+
+### Writing PHPUnit Tests
+
+<Steps>
+  <Step title="Create Test Class">
+    ```php tests/php/src/Internal/Admin/OrdersTest.php
+    <?php
+    namespace Automattic\WooCommerce\Tests\Internal\Admin;
+    
+    use Automattic\WooCommerce\Internal\Admin\Orders;
+    
+    /**
+     * Tests for Orders class.
+     */
+    class OrdersTest extends \WC_Unit_Test_Case {
+        
+        /**
+         * Test setup.
+         */
+        public function setUp(): void {
+            parent::setUp();
+            // Setup code
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Write Test Methods">
+    ```php
+    /**
+     * Test that orders are retrieved correctly.
+     */
+    public function test_get_orders_returns_array() {
+        $orders = new Orders();
+        $result = $orders->get_orders();
+        
+        $this->assertIsArray( $result );
+        $this->assertNotEmpty( $result );
+    }
+    
+    /**
+     * Test order creation.
+     */
+    public function test_create_order_returns_order_id() {
+        $order_id = wc_create_order();
+        
+        $this->assertIsInt( $order_id );
+        $this->assertGreaterThan( 0, $order_id );
+    }
+    ```
+  </Step>
+  
+  <Step title="Use Factory Methods">
+    ```php
+    /**
+     * Test order with products.
+     */
+    public function test_order_with_products() {
+        // Create test data using factories
+        $product = WC_Helper_Product::create_simple_product();
+        $order   = WC_Helper_Order::create_order();
+        
+        $order->add_product( $product );
+        $order->save();
+        
+        $this->assertEquals( 1, $order->get_item_count() );
+    }
+    ```
+  </Step>
+</Steps>
+
+### PHPUnit Configuration
+
+The `phpunit.xml` file configures PHPUnit:
+
+```xml phpunit.xml
+<phpunit>
+  <testsuites>
+    <testsuite name="wc-phpunit-main">
+      <directory suffix="Test.php">./tests/php/src</directory>
+    </testsuite>
+    <testsuite name="wc-phpunit-legacy">
+      <directory suffix="-test.php">./tests/php/includes</directory>
+    </testsuite>
+  </testsuites>
+</phpunit>
+```
+
+## JavaScript/Jest Tests
+
+Jest tests validate JavaScript and React component functionality.
+
+### Running Jest Tests
+
+```bash
+# Run all JavaScript tests (from root)
+pnpm test
+
+# Run tests for specific package
+pnpm --filter='@woocommerce/components' test
+
+# Run tests in watch mode
+pnpm --filter='@woocommerce/components' test -- --watch
+
+# Run tests with coverage
+pnpm --filter='@woocommerce/components' test -- --coverage
+```
+
+### Writing Jest Tests
+
+<Tabs>
+  <Tab title="Component Tests">
+    ```javascript OrderStatus.test.js
+    import { render, screen } from '@testing-library/react';
+    import { OrderStatus } from '../OrderStatus';
+    
+    describe( 'OrderStatus', () => {
+      it( 'renders pending status', () => {
+        render( <OrderStatus status="pending" /> );
+        expect( 
+          screen.getByText( 'Pending' ) 
+        ).toBeInTheDocument();
+      } );
+      
+      it( 'renders completed status with icon', () => {
+        render( <OrderStatus status="completed" /> );
+        expect( 
+          screen.getByTestId( 'status-icon' ) 
+        ).toBeInTheDocument();
+      } );
+    } );
+    ```
+  </Tab>
+  
+  <Tab title="Hook Tests">
+    ```javascript useOrders.test.js
+    import { renderHook, waitFor } from '@testing-library/react';
+    import { useOrders } from '../useOrders';
+    
+    describe( 'useOrders', () => {
+      it( 'fetches orders on mount', async () => {
+        const { result } = renderHook( () => useOrders() );
+        
+        await waitFor( () => {
+          expect( result.current.isLoading ).toBe( false );
+        } );
+        
+        expect( result.current.orders ).toHaveLength( 10 );
+      } );
+    } );
+    ```
+  </Tab>
+  
+  <Tab title="Utility Tests">
+    ```javascript formatPrice.test.js
+    import { formatPrice } from '../formatPrice';
+    
+    describe( 'formatPrice', () => {
+      it( 'formats price with currency symbol', () => {
+        expect( formatPrice( 10.5 ) ).toBe( '$10.50' );
+      } );
+      
+      it( 'handles zero price', () => {
+        expect( formatPrice( 0 ) ).toBe( '$0.00' );
+      } );
+      
+      it( 'rounds to two decimals', () => {
+        expect( formatPrice( 10.999 ) ).toBe( '$11.00' );
+      } );
+    } );
+    ```
+  </Tab>
+</Tabs>
+
+## End-to-End (E2E) Tests
+
+Playwright tests simulate real user interactions in a browser environment.
+
+### Running E2E Tests
+
+```bash
+# Install Playwright browsers (first time only)
+pnpm test:e2e:install
+
+# Run all E2E tests
+pnpm test:e2e
+
+# Run E2E tests with HPOS disabled
+pnpm test:e2e:hpos-off
+
+# Run E2E tests with Gutenberg stable
+pnpm test:e2e:gb-stable
+
+# Run E2E tests with Gutenberg nightly
+pnpm test:e2e:gb-nightly
+
+# Run with specific project
+pnpm test:e2e:default --project=e2e
+```
+
+### Running API Tests
+
+```bash
+# Run all API tests
+pnpm test:api
+
+# Run API tests with HPOS disabled
+pnpm test:api:hpos-off
+
+# Run API tests with object cache
+pnpm test:api:object-cache
+```
+
+### Writing E2E Tests
+
+<Steps>
+  <Step title="Create Test File">
+    ```typescript tests/e2e-pw/tests/merchant/create-order.spec.ts
+    import { test, expect } from '@playwright/test';
+    import { admin } from '@woocommerce/e2e-utils-playwright';
+    ```
+  </Step>
+  
+  <Step title="Write Test Cases">
+    ```typescript
+    test.describe( 'Order Creation', () => {
+      test.beforeEach( async ( { page } ) => {
+        await admin.login( page );
+      } );
+      
+      test( 'can create a new order', async ( { page } ) => {
+        // Navigate to orders page
+        await page.goto( '/wp-admin/edit.php?post_type=shop_order' );
+        
+        // Click add new
+        await page.click( 'text=Add order' );
+        
+        // Fill order details
+        await page.fill( '#order_status', 'pending' );
+        
+        // Save order
+        await page.click( 'text=Create' );
+        
+        // Verify success
+        await expect(
+          page.locator( '.notice-success' )
+        ).toBeVisible();
+      } );
+    } );
+    ```
+  </Step>
+</Steps>
+
+### E2E Test Helpers
+
+```typescript
+import { 
+  admin,
+  customer,
+  merchant,
+  utils 
+} from '@woocommerce/e2e-utils-playwright';
+
+// Login as admin
+await admin.login( page );
+
+// Create product
+const productId = await merchant.createSimpleProduct( {
+  name: 'Test Product',
+  regularPrice: '10.00',
+} );
+
+// Add to cart as customer
+await customer.addToCart( productId );
+await customer.goToCheckout();
+```
+
+## Performance Tests
+
+K6 performance tests measure system performance under load.
+
+```bash
+# Install K6
+pnpm test:perf:install-k6
+
+# Setup performance environment
+pnpm env:perf
+
+# Run performance tests
+pnpm test:perf
+
+# Run with CI setup
+pnpm test:perf:ci-setup
+```
+
+## Test Coverage Requirements
+
+When contributing code, ensure appropriate test coverage:
+
+### What to Test
+
+<Tabs>
+  <Tab title="New Features">
+    - [ ] Unit tests for all new classes and methods
+    - [ ] Integration tests for WordPress interactions
+    - [ ] E2E tests for user-facing functionality
+    - [ ] API tests for new endpoints
+  </Tab>
+  
+  <Tab title="Bug Fixes">
+    - [ ] Regression test that reproduces the bug
+    - [ ] Test verifying the fix works
+    - [ ] Related functionality tests
+  </Tab>
+  
+  <Tab title="Refactoring">
+    - [ ] All existing tests still pass
+    - [ ] New tests for refactored code
+    - [ ] Integration tests if architecture changed
+  </Tab>
+</Tabs>
+
+### Coverage Guidelines
+
+<Note>
+  Aim for:
+  - **80%+ code coverage** for new PHP classes
+  - **100% coverage** for critical payment/order processing code
+  - **E2E tests** for all user-facing features
+  - **API tests** for all REST API endpoints
+</Note>
+
+## CI/CD Testing
+
+All pull requests automatically run tests in CI:
+
+### Automated Test Runs
+
+- **PHP Unit Tests**: PHP 7.4, 8.5 with WordPress latest/latest-1
+- **E2E Tests**: Multiple shards for parallel execution
+- **API Tests**: Full API test suite
+- **Linting**: PHP, JavaScript, and markdown linting
+- **PHPStan**: Static analysis for type safety
+
+### Test Environments
+
+CI tests run in multiple configurations:
+
+```yaml
+# PHP versions
+- PHP 7.4 + WP latest-1
+- PHP 8.5 + WP latest
+- PHP 8.5 + WP latest (HPOS disabled)
+
+# E2E variations
+- Default environment
+- HPOS disabled
+- Gutenberg stable
+- Gutenberg nightly
+- Legacy MiniCart
+```
+
+<Warning>
+  All tests must pass before a PR can be merged. Fix any failing tests before requesting review.
+</Warning>
+
+## Debugging Tests
+
+### PHPUnit Debugging
+
+```bash
+# Run with verbose output
+pnpm test:php:env -- --verbose
+
+# Run single test with debugging
+pnpm test:php:env -- --filter TestClassName --debug
+
+# View wp-env logs
+pnpm wp-env logs
+```
+
+### Playwright Debugging
+
+```bash
+# Run in headed mode (see browser)
+pnpm test:e2e -- --headed
+
+# Debug mode (step through tests)
+pnpm test:e2e -- --debug
+
+# Generate trace
+pnpm test:e2e -- --trace on
+
+# View test report
+pnpm playwright show-report
+```
+
+## Common Testing Issues
+
+<AccordionGroup>
+  <Accordion title="Docker not running">
+    Ensure Docker Desktop is running before starting wp-env:
+    ```bash
+    # Check Docker status
+    docker ps
+    
+    # Start Docker Desktop
+    open -a Docker  # macOS
+    ```
+  </Accordion>
+  
+  <Accordion title="Port conflicts">
+    If port 8888 is in use, wp-env will fail to start:
+    ```bash
+    # Check what's using the port
+    lsof -i :8888
+    
+    # Kill the process
+    kill -9 <PID>
+    ```
+  </Accordion>
+  
+  <Accordion title="Database reset needed">
+    Sometimes tests fail due to database state:
+    ```bash
+    # Reset environment
+    pnpm env:restart
+    ```
+  </Accordion>
+  
+  <Accordion title="Chromium install fails">
+    If Playwright browser installation fails:
+    ```bash
+    # Manually install
+    pnpm playwright install chromium
+    
+    # Install system dependencies
+    pnpm playwright install-deps
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Git Workflow" icon="code-branch" href="/contributing/git-workflow">
+    Learn the Git workflow for committing and creating PRs
+  </Card>
+  <Card title="Coding Standards" icon="code" href="/contributing/coding-standards">
+    Review coding standards and linting requirements
+  </Card>
+</CardGroup>

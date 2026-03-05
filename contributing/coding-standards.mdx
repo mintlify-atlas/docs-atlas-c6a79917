@@ -1,0 +1,414 @@
+---
+title: Coding Standards
+description: PHP and JavaScript coding standards, linting tools, and code review requirements for WooCommerce development
+---
+
+WooCommerce follows strict coding standards to ensure code quality, consistency, and maintainability across the entire codebase. This guide covers both PHP and JavaScript standards.
+
+## PHP Coding Standards
+
+WooCommerce follows the [WordPress Coding Standards](https://make.wordpress.org/core/handbook/best-practices/coding-standards/php/) for PHP code, with additional WooCommerce-specific requirements.
+
+### PHP Standards Overview
+
+<CardGroup cols={2}>
+  <Card title="WordPress Standards" icon="wordpress">
+    Base standards from WordPress core
+  </Card>
+  <Card title="WooCommerce Core" icon="shopping-cart">
+    Additional WooCommerce-specific rules
+  </Card>
+  <Card title="PSR-4 Autoloading" icon="folder-tree">
+    Modern code in `src/` directory
+  </Card>
+  <Card title="PHP Compatibility" icon="php">
+    Support for PHP 7.4+
+  </Card>
+</CardGroup>
+
+### Modern vs Legacy Code Architecture
+
+WooCommerce has two distinct code styles based on directory structure:
+
+<CodeGroup>
+
+```text Modern Code (src/)
+plugins/woocommerce/
+├── src/                    # Modern PHP code
+│   ├── Internal/           # Internal classes (default)
+│   └── [Public classes]    # Public API classes
+│
+# Standards:
+# - PSR-4 autoloading
+# - Dependency injection
+# - Strict class naming (PascalCase)
+# - Final classes by default
+# - @internal tag for internal classes
+```
+
+```text Legacy Code (includes/)
+plugins/woocommerce/
+├── includes/               # Legacy WordPress code
+│   └── class-woocommerce.php
+│
+# Standards:
+# - WordPress file naming (class-*.php)
+# - Global state patterns
+# - Modify only when necessary
+```
+
+</CodeGroup>
+
+### PHP Linting Commands
+
+Run these commands from the WooCommerce plugin directory:
+
+```bash
+# Lint all PHP files
+pnpm --filter=@woocommerce/plugin-woocommerce lint:php
+
+# Lint only changed files
+pnpm --filter=@woocommerce/plugin-woocommerce lint:php:changes
+
+# Lint changed files on current branch
+pnpm --filter=@woocommerce/plugin-woocommerce lint:php:changes:branch
+
+# Lint only staged files (pre-commit)
+pnpm --filter=@woocommerce/plugin-woocommerce lint:php:changes:staged
+
+# Auto-fix linting issues
+pnpm --filter=@woocommerce/plugin-woocommerce lint:php:fix
+```
+
+<Info>
+  The pre-commit hook will automatically run linting on staged PHP files before allowing a commit.
+</Info>
+
+### PHPStan Static Analysis
+
+Before committing PHP changes, run PHPStan to catch type errors:
+
+```bash
+# Run PHPStan on modified files (from plugins/woocommerce directory)
+composer exec -- phpstan analyse path/to/modified/File.php --memory-limit=2G
+
+# Run PHPStan on all files
+pnpm --filter=@woocommerce/plugin-woocommerce phpstan
+
+# Update baseline if you've fixed baselined errors
+pnpm --filter=@woocommerce/plugin-woocommerce phpstan:baseline
+```
+
+<Warning>
+  PHPStan failures often indicate the need to update the baseline file (`phpstan-baseline.neon`). If your fix resolves a previously baselined error, remove the corresponding entry from the baseline.
+</Warning>
+
+### PHP Configuration (phpcs.xml)
+
+The root `phpcs.xml` file defines the PHP_CodeSniffer rules:
+
+```xml phpcs.xml
+<?xml version="1.0"?>
+<ruleset name="WordPress Coding Standards">
+  <!-- Base ruleset -->
+  <rule ref="WooCommerce-Core" />
+  
+  <!-- Minimum supported versions -->
+  <config name="minimum_supported_wp_version" value="5.2" />
+  <config name="testVersion" value="7.4-" />
+  
+  <!-- Dependency injection for modern code -->
+  <rule ref="WooCommerce.Functions.InternalInjectionMethod">
+    <include-pattern>src/</include-pattern>
+    <properties>
+      <property name="injectionMethod" value="init"/>
+    </properties>
+  </rule>
+  
+  <!-- Strict class naming for modern code -->
+  <rule ref="Squiz.Classes.ClassFileName">
+    <include-pattern>src/</include-pattern>
+  </rule>
+</ruleset>
+```
+
+### PHP Code Requirements
+
+<Steps>
+  <Step title="Namespace Requirements">
+    All modern code must use the `Automattic\WooCommerce` namespace:
+    ```php
+    namespace Automattic\WooCommerce\Internal\Admin;
+    ```
+  </Step>
+  
+  <Step title="Dependency Injection">
+    Classes in `src/` must use dependency injection via `init()` method:
+    ```php
+    final class OrderController {
+        private OrderRepository $repository;
+        
+        final public function init( OrderRepository $repository ) {
+            $this->repository = $repository;
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Documentation">
+    All classes and methods must have proper DocBlocks:
+    ```php
+    /**
+     * Handles order processing.
+     *
+     * @since 9.0.0
+     * @internal
+     */
+    final class OrderProcessor {
+        /**
+         * Process an order.
+         *
+         * @param int $order_id Order ID.
+         * @return bool True on success.
+         */
+        public function process( int $order_id ): bool {
+            // Implementation
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Type Hints">
+    Use PHP type hints for all parameters and return values (PHP 7.4+):
+    ```php
+    public function get_order( int $id ): ?Order {
+        return $this->repository->find( $id );
+    }
+    ```
+  </Step>
+</Steps>
+
+## JavaScript Coding Standards
+
+JavaScript code follows the WordPress JavaScript coding standards via ESLint.
+
+### JavaScript Linting
+
+```bash
+# Lint JavaScript files
+pnpm --filter=@woocommerce/plugin-woocommerce lint:lang:js
+
+# Lint changed JavaScript on current branch
+pnpm --filter=@woocommerce/plugin-woocommerce lint:changes:branch:js
+
+# Lint with auto-fix
+npx eslint --fix path/to/file.js
+```
+
+### ESLint Configuration
+
+The root `.eslintrc.js` extends WooCommerce ESLint plugin:
+
+```javascript .eslintrc.js
+module.exports = {
+  root: true,
+  extends: [ 'plugin:@woocommerce/eslint-plugin/recommended' ],
+};
+```
+
+### JavaScript Code Requirements
+
+<Tabs>
+  <Tab title="React Components">
+    ```jsx
+    import { useState } from 'react';
+    
+    /**
+     * Order status display component.
+     *
+     * @param {Object} props Component props.
+     * @param {number} props.orderId Order ID to display.
+     * @return {JSX.Element} Component markup.
+     */
+    export const OrderStatus = ( { orderId } ) => {
+      const [ status, setStatus ] = useState( 'pending' );
+      
+      return (
+        <div className="order-status">
+          Status: { status }
+        </div>
+      );
+    };
+    ```
+  </Tab>
+  
+  <Tab title="TypeScript">
+    ```typescript
+    interface Order {
+      id: number;
+      status: string;
+      total: number;
+    }
+    
+    /**
+     * Fetches order by ID.
+     */
+    export const fetchOrder = async ( 
+      orderId: number 
+    ): Promise<Order> => {
+      const response = await fetch( `/api/orders/${ orderId }` );
+      return response.json();
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Testing">
+    ```javascript
+    import { render, screen } from '@testing-library/react';
+    import { OrderStatus } from '../OrderStatus';
+    
+    describe( 'OrderStatus', () => {
+      it( 'renders order status', () => {
+        render( <OrderStatus orderId={ 123 } /> );
+        expect( screen.getByText( /Status:/ ) ).toBeInTheDocument();
+      } );
+    } );
+    ```
+  </Tab>
+</Tabs>
+
+## Code Review Requirements
+
+Before submitting a pull request, ensure your code meets these requirements:
+
+### Pre-Commit Checklist
+
+- [ ] All PHP code passes `lint:php:changes` without errors
+- [ ] All JavaScript code passes `lint:lang:js` without errors
+- [ ] PHPStan analysis passes on modified PHP files
+- [ ] Code follows WordPress and WooCommerce coding standards
+- [ ] All functions and classes have proper documentation
+- [ ] Type hints are used for all parameters and return values (PHP)
+- [ ] No hardcoded text strings (use i18n functions)
+- [ ] Security best practices are followed (nonce verification, sanitization, escaping)
+- [ ] Code supports minimum PHP (7.4+) and WordPress (5.2+) versions
+
+### Pre-Commit Hooks
+
+The repository includes Husky pre-commit hooks that automatically run:
+
+```json package.json (lint-staged)
+{
+  "lint-staged": {
+    "*.php": [
+      "php -d display_errors=1 -l",
+      "composer run-script lint-staged"
+    ],
+    "!(*min).js": [
+      "eslint --fix"
+    ]
+  }
+}
+```
+
+<Info>
+  The hooks will automatically fix many issues and prevent commits that don't meet standards.
+</Info>
+
+## Editor Configuration
+
+### EditorConfig
+
+Use [EditorConfig](http://editorconfig.org/) to automatically configure your editor:
+
+```ini .editorconfig
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.php]
+indent_style = tab
+indent_size = 4
+
+[*.{js,json}]
+indent_style = space
+indent_size = 2
+```
+
+<Warning>
+  Always use **LF** (Unix) line endings, never CRLF (Windows). This is critical for Git consistency.
+</Warning>
+
+## Common Standards Issues
+
+### Text Domain
+
+All translatable strings must use the `woocommerce` text domain:
+
+```php
+// ✅ Correct
+__( 'Order status', 'woocommerce' );
+
+// ❌ Incorrect - wrong domain
+__( 'Order status', 'my-plugin' );
+
+// ❌ Incorrect - missing domain
+__( 'Order status' );
+```
+
+### File Naming
+
+<Tabs>
+  <Tab title="Modern Code (src/)">
+    ```text
+    # Class: Automattic\WooCommerce\Internal\Admin\OrderController
+    # File:  src/Internal/Admin/OrderController.php
+    
+    ✅ PascalCase class names
+    ✅ Matches namespace structure
+    ```
+  </Tab>
+  
+  <Tab title="Legacy Code (includes/)">
+    ```text
+    # Class: WC_Order_Controller
+    # File:  includes/admin/class-wc-order-controller.php
+    
+    ✅ Lowercase with hyphens
+    ✅ Prefixed with 'class-'
+    ```
+  </Tab>
+</Tabs>
+
+### Escaping and Sanitization
+
+```php
+// ✅ Correct - escaped output
+echo '<div>' . esc_html( $order->get_status() ) . '</div>';
+
+// ❌ Incorrect - unescaped output
+echo '<div>' . $order->get_status() . '</div>';
+
+// ✅ Correct - sanitized input
+$order_id = isset( $_POST['order_id'] ) 
+    ? absint( $_POST['order_id'] ) 
+    : 0;
+
+// ❌ Incorrect - unsanitized input
+$order_id = $_POST['order_id'];
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Testing" icon="vial" href="/contributing/testing">
+    Learn about testing requirements and commands
+  </Card>
+  <Card title="Git Workflow" icon="code-branch" href="/contributing/git-workflow">
+    Follow our Git workflow for contributions
+  </Card>
+</CardGroup>

@@ -1,0 +1,342 @@
+---
+title: Getting Started with WooCommerce Blocks
+description: Introduction to WooCommerce block development, Gutenberg integration, and available block types
+---
+
+# Getting Started with WooCommerce Blocks
+
+WooCommerce Blocks provide a modern, block-based approach to building e-commerce experiences in WordPress. Built on the WordPress Gutenberg editor, WooCommerce Blocks enable you to create dynamic, customizable shopping experiences using React and TypeScript.
+
+## What are WooCommerce Blocks?
+
+WooCommerce Blocks are reusable components that extend the WordPress Block Editor to provide e-commerce functionality. They leverage the WordPress Gutenberg architecture to deliver:
+
+- **Modern React Components**: Built with TypeScript and React for type safety and maintainability
+- **Server-Side Rendering**: PHP integration for optimal performance and SEO
+- **Store API Integration**: RESTful API for cart, checkout, and product data
+- **Extensibility**: Hooks, filters, and Slot Fills for customization
+
+## Block Architecture
+
+WooCommerce blocks follow the WordPress Block API specification:
+
+```json
+{
+  "apiVersion": 3,
+  "name": "woocommerce/product-collection",
+  "title": "Product Collection",
+  "category": "woocommerce",
+  "description": "Display a collection of products from your store.",
+  "supports": {
+    "align": ["wide", "full"],
+    "html": false,
+    "interactivity": true
+  },
+  "attributes": {
+    "query": { "type": "object" },
+    "displayLayout": { "type": "object" }
+  }
+}
+```
+
+## Types of WooCommerce Blocks
+
+### Product Blocks
+
+Display and interact with products:
+
+- **Product Collection**: Display filterable product collections with customizable queries
+- **Product Gallery**: Showcase product images with thumbnails and large image views
+- **Product Filters**: Enable filtering by attributes, price, ratings, and taxonomy
+- **Product Reviews**: Display customer reviews with pagination and filtering
+- **Single Product**: Render individual product details and metadata
+
+### Cart & Checkout Blocks
+
+Handle the purchase flow:
+
+- **Cart Block**: Modern cart experience with line items, totals, and coupon support
+- **Checkout Block**: Multi-step checkout with address fields, payment methods, and order summary
+- **Mini Cart**: Slide-out cart accessible from anywhere on the site
+
+<Info>
+Cart and Checkout blocks are highly extensible with Slot Fills, filters, and custom inner blocks. See the [Extensible Blocks](/blocks/extensible-blocks) guide for details.
+</Info>
+
+### Product Editor Blocks
+
+Build custom product editing interfaces:
+
+- **Product Fields**: Input controls for name, price, description, inventory
+- **Generic Blocks**: Reusable form components (sections, tabs, subsections)
+- **Custom Blocks**: Extension points for plugin-specific product data
+
+Example product editor block structure:
+
+```tsx
+import { useWooBlockProps } from '@woocommerce/block-templates';
+import { useEntityProp } from '@wordpress/core-data';
+import { InputControl } from '@wordpress/components';
+
+export function ProductNameEdit({ attributes }) {
+  const blockProps = useWooBlockProps(attributes);
+  const [name, setName] = useEntityProp('postType', 'product', 'name');
+
+  return (
+    <div {...blockProps}>
+      <InputControl
+        value={name}
+        onChange={setName}
+        placeholder="e.g. 12 oz Coffee Mug"
+      />
+    </div>
+  );
+}
+```
+
+## Gutenberg Integration
+
+WooCommerce blocks integrate seamlessly with WordPress Gutenberg:
+
+### Block Registration
+
+Blocks are registered using the WordPress Block API:
+
+```typescript
+import { registerBlockType } from '@wordpress/blocks';
+import metadata from './block.json';
+import { Edit, Save } from './edit';
+
+registerBlockType(metadata, {
+  icon: {
+    src: <MyCustomIcon />,
+    foreground: '#874FB9',
+  },
+  edit: Edit,
+  save: Save,
+});
+```
+
+### Block Context
+
+Blocks can share data through context:
+
+```json
+{
+  "providesContext": {
+    "queryId": "queryId",
+    "query": "query",
+    "displayLayout": "displayLayout"
+  },
+  "usesContext": ["templateSlug", "postId"]
+}
+```
+
+### Inner Blocks
+
+Create nested block structures:
+
+```typescript
+import { useInnerBlocksProps } from '@wordpress/block-editor';
+
+export function Edit() {
+  const innerBlocksProps = useInnerBlocksProps(
+    {},
+    {
+      template: [
+        ['woocommerce/product-image'],
+        ['woocommerce/product-title'],
+        ['woocommerce/product-price']
+      ],
+      allowedBlocks: ['woocommerce/product-*']
+    }
+  );
+
+  return <div {...innerBlocksProps} />;
+}
+```
+
+## Development Environment Setup
+
+<Steps>
+
+### Install Node.js
+
+WooCommerce blocks require Node.js 20 or higher:
+
+```bash
+nvm install 20 && nvm use 20
+# or
+fnm install 20 && fnm use 20
+```
+
+### Create Your First Block
+
+Use the official block template for Cart & Checkout extensions:
+
+```bash
+cd wp-content/plugins
+npx @wordpress/create-block -t @woocommerce/extend-cart-checkout-block my-extension
+```
+
+For Product Editor blocks:
+
+```bash
+npx @wordpress/create-block --template @woocommerce/create-product-editor-block my-product-block
+```
+
+### Build Your Block
+
+```bash
+cd my-extension
+npm install
+npm run build
+```
+
+For development with hot reload:
+
+```bash
+npm start
+```
+
+### Activate Your Plugin
+
+Go to **WordPress Admin → Plugins** and activate your new extension.
+
+</Steps>
+
+## Build System
+
+WooCommerce blocks use `@wordpress/scripts` for build configuration:
+
+```javascript
+// webpack.config.js
+const defaultConfig = require('@wordpress/scripts/config/webpack.config');
+const WooCommerceDependencyExtractionWebpackPlugin = require('@woocommerce/dependency-extraction-webpack-plugin');
+
+module.exports = {
+  ...defaultConfig,
+  plugins: [
+    ...defaultConfig.plugins.filter(
+      (plugin) =>
+        plugin.constructor.name !== 'DependencyExtractionWebpackPlugin'
+    ),
+    new WooCommerceDependencyExtractionWebpackPlugin(),
+  ],
+};
+```
+
+### Dependency Extraction
+
+The `WooCommerceDependencyExtractionWebpackPlugin` automatically:
+
+- Externalizes WordPress and WooCommerce dependencies
+- Generates `.asset.php` files with dependency lists and versions
+- Maps imports to global variables (e.g., `@woocommerce/blocks-checkout` → `window.wc.wcBlocksCheckout`)
+
+<CodeGroup>
+
+```typescript JavaScript Import
+import { registerCheckoutFilters } from '@woocommerce/blocks-checkout';
+```
+
+```javascript Global Variable
+const { registerCheckoutFilters } = window.wc.blocksCheckout;
+```
+
+</CodeGroup>
+
+## Registering Scripts
+
+Enqueue blocks using the generated asset file:
+
+```php
+<?php
+function my_extension_register_blocks() {
+  $script_path = '/build/index.js';
+  $script_url = plugins_url($script_path, __FILE__);
+  
+  $script_asset_path = dirname(__FILE__) . '/build/index.asset.php';
+  $script_asset = file_exists($script_asset_path)
+    ? require $script_asset_path
+    : ['dependencies' => [], 'version' => '1.0.0'];
+  
+  wp_register_script(
+    'my-extension-blocks',
+    $script_url,
+    $script_asset['dependencies'],
+    $script_asset['version'],
+    true
+  );
+  
+  wp_enqueue_script('my-extension-blocks');
+}
+add_action('enqueue_block_editor_assets', 'my_extension_register_blocks');
+```
+
+## Available Components
+
+WooCommerce provides reusable React components:
+
+```typescript
+import {
+  Button,
+  Label,
+  ValidationInputError,
+  CheckboxControl,
+  Panel
+} from '@woocommerce/blocks-components';
+
+import {
+  useValidateCheckout,
+  useStoreCart
+} from '@woocommerce/blocks-checkout';
+```
+
+<Note>
+View all available components in the [WooCommerce Storybook](https://woocommerce.github.io/woocommerce/?path=/docs/woocommerce-blocks_external-components-button--docs) under "WooCommerce Blocks → External components".
+</Note>
+
+## Data Stores
+
+Access WooCommerce data using WordPress data stores:
+
+```typescript
+import { useSelect } from '@wordpress/data';
+
+function MyComponent() {
+  const cartData = useSelect((select) => {
+    return select('wc/store/cart').getCartData();
+  });
+
+  return <div>Cart total: {cartData.totals.total_price}</div>;
+}
+```
+
+<Warning>
+All WooCommerce Interactivity API stores are **private** (`lock: true`). Do not rely on internal store structure as it may change without notice. Use exported selectors and actions only.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Extensible Blocks" icon="puzzle-piece" href="/blocks/extensible-blocks">
+    Learn how to extend Cart, Checkout, and Product Collection blocks with filters and Slot Fills
+  </Card>
+  <Card title="Tutorials" icon="book" href="/blocks/tutorials">
+    Follow step-by-step guides to build custom WooCommerce blocks
+  </Card>
+  <Card title="Store API" icon="code" href="/apis/store-api">
+    Extend the REST API to add custom data to cart and checkout
+  </Card>
+  <Card title="Block Reference" icon="book-open" href="/blocks/reference">
+    Explore detailed API documentation for filters, hooks, and components
+  </Card>
+</CardGroup>
+
+## Resources
+
+- [WordPress Block Editor Handbook](https://developer.wordpress.org/block-editor/)
+- [WooCommerce Blocks GitHub](https://github.com/woocommerce/woocommerce/tree/trunk/plugins/woocommerce/client/blocks)
+- [WooCommerce Storybook](https://woocommerce.github.io/woocommerce/)
+- [@woocommerce/dependency-extraction-webpack-plugin](https://www.npmjs.com/package/@woocommerce/dependency-extraction-webpack-plugin)

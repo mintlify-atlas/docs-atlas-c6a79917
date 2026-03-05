@@ -1,0 +1,549 @@
+---
+title: WooCommerce Analytics
+description: Extend and customize WooCommerce Analytics reports, add custom data, and create new analytics features
+---
+
+# WooCommerce Analytics
+
+WooCommerce Analytics provides powerful reporting and insights for your store. This guide shows you how to extend analytics reports, add custom columns, modify SQL queries, and create custom tracking.
+
+## Overview
+
+The analytics system in WooCommerce provides:
+
+- Pre-built reports for orders, products, customers, and more
+- Extensible data stores using custom database tables
+- JavaScript hooks for UI customization
+- PHP filters for modifying queries and data
+- REST API endpoints for accessing report data
+
+<Info>
+WooCommerce Analytics uses dedicated database tables (with `wc_` prefix) for optimized query performance, separate from WordPress core tables.
+</Info>
+
+## Extending Analytics Reports
+
+### Adding a Custom Filter
+
+Add UI filters to reports to allow merchants to segment data:
+
+```javascript
+import { addFilter } from '@wordpress/hooks';
+import { __ } from '@wordpress/i18n';
+
+// Add a custom filter to the Orders Report
+const addCustomFilter = ( filters ) => {
+  return [
+    {
+      label: __( 'Payment Method', 'my-extension' ),
+      staticParams: [],
+      param: 'payment_method',
+      showFilters: () => true,
+      defaultValue: 'any',
+      filters: [
+        { label: __( 'Any', 'my-extension' ), value: 'any' },
+        { label: __( 'Credit Card', 'my-extension' ), value: 'stripe' },
+        { label: __( 'PayPal', 'my-extension' ), value: 'paypal' },
+        { label: __( 'Bank Transfer', 'my-extension' ), value: 'bacs' },
+      ],
+    },
+    ...filters,
+  ];
+};
+
+addFilter(
+  'woocommerce_admin_orders_report_filters',
+  'my-extension',
+  addCustomFilter
+);
+```
+
+### Handling Filter Parameters
+
+Process the filter parameter on the backend:
+
+```php
+/**
+ * Add payment method to query arguments.
+ *
+ * @param array $args Query arguments.
+ * @return array
+ */
+function add_payment_method_arg( $args ) {
+    $payment_method = isset( $_GET['payment_method'] ) ? sanitize_text_field( wp_unslash( $_GET['payment_method'] ) ) : 'any';
+    
+    if ( 'any' !== $payment_method ) {
+        $args['payment_method'] = $payment_method;
+    }
+    
+    return $args;
+}
+add_filter( 'woocommerce_analytics_orders_query_args', 'add_payment_method_arg' );
+add_filter( 'woocommerce_analytics_orders_stats_query_args', 'add_payment_method_arg' );
+```
+
+### Modifying SQL Queries
+
+Extend the SQL queries to filter data:
+
+```php
+/**
+ * Add JOIN clause for payment method.
+ *
+ * @param array $clauses SQL clauses.
+ * @return array
+ */
+function add_payment_method_join( $clauses ) {
+    global $wpdb;
+    
+    $clauses[] = "LEFT JOIN {$wpdb->postmeta} pm ON {$wpdb->prefix}wc_order_stats.order_id = pm.post_id AND pm.meta_key = '_payment_method'";
+    
+    return $clauses;
+}
+add_filter( 'woocommerce_analytics_clauses_join_orders_subquery', 'add_payment_method_join' );
+add_filter( 'woocommerce_analytics_clauses_join_orders_stats_total', 'add_payment_method_join' );
+add_filter( 'woocommerce_analytics_clauses_join_orders_stats_interval', 'add_payment_method_join' );
+
+/**
+ * Add WHERE clause for payment method.
+ *
+ * @param array $clauses SQL clauses.
+ * @return array
+ */
+function add_payment_method_where( $clauses ) {
+    global $wpdb;
+    
+    $payment_method = isset( $_GET['payment_method'] ) ? sanitize_text_field( wp_unslash( $_GET['payment_method'] ) ) : '';
+    
+    if ( ! empty( $payment_method ) && 'any' !== $payment_method ) {
+        $clauses[] = $wpdb->prepare( 'AND pm.meta_value = %s', $payment_method );
+    }
+    
+    return $clauses;
+}
+add_filter( 'woocommerce_analytics_clauses_where_orders_subquery', 'add_payment_method_where' );
+add_filter( 'woocommerce_analytics_clauses_where_orders_stats_total', 'add_payment_method_where' );
+add_filter( 'woocommerce_analytics_clauses_where_orders_stats_interval', 'add_payment_method_where' );
+
+/**
+ * Add SELECT clause for payment method.
+ *
+ * @param array $clauses SQL clauses.
+ * @return array
+ */
+function add_payment_method_select( $clauses ) {
+    $clauses[] = ', pm.meta_value AS payment_method';
+    return $clauses;
+}
+add_filter( 'woocommerce_analytics_clauses_select_orders_subquery', 'add_payment_method_select' );
+add_filter( 'woocommerce_analytics_clauses_select_orders_stats_total', 'add_payment_method_select' );
+add_filter( 'woocommerce_analytics_clauses_select_orders_stats_interval', 'add_payment_method_select' );
+```
+
+## Adding Columns to Reports
+
+Add custom columns to analytics tables:
+
+```javascript
+import { addFilter } from '@wordpress/hooks';
+
+const addTableColumn = ( reportTableData ) => {
+  // Only modify the orders report
+  if ( 'orders' !== reportTableData.endpoint ) {
+    return reportTableData;
+  }
+
+  // Add new header
+  const newHeaders = [
+    {
+      label: 'Payment Method',
+      key: 'payment_method',
+    },
+    ...reportTableData.headers,
+  ];
+
+  // Add data to each row
+  const newRows = reportTableData.rows.map( ( row, index ) => {
+    const item = reportTableData.items.data[ index ];
+    const newRow = [
+      {
+        display: item.payment_method || 'N/A',
+        value: item.payment_method || '',
+      },
+      ...row,
+    ];
+    return newRow;
+  } );
+
+  reportTableData.headers = newHeaders;
+  reportTableData.rows = newRows;
+
+  return reportTableData;
+};
+
+addFilter(
+  'woocommerce_admin_report_table',
+  'my-extension',
+  addTableColumn
+);
+```
+
+## Custom Currency Formatting
+
+Modify how currencies are displayed in reports:
+
+```javascript
+import { addFilter } from '@wordpress/hooks';
+
+const updateReportCurrency = ( config, { currency } ) => {
+  // Custom currency configurations
+  const currencies = {
+    EUR: {
+      code: 'EUR',
+      symbol: '€',
+      symbolPosition: 'right',
+      thousandSeparator: '.',
+      decimalSeparator: ',',
+      precision: 2,
+    },
+    GBP: {
+      code: 'GBP',
+      symbol: '£',
+      symbolPosition: 'left',
+      thousandSeparator: ',',
+      decimalSeparator: '.',
+      precision: 2,
+    },
+  };
+
+  if ( currency && currencies[ currency ] ) {
+    return currencies[ currency ];
+  }
+
+  return config;
+};
+
+addFilter(
+  'woocommerce_admin_report_currency',
+  'my-extension',
+  updateReportCurrency
+);
+```
+
+## Adding Custom Report Sections
+
+Register custom analytics sections and pages:
+
+```php
+/**
+ * Register a custom analytics page.
+ *
+ * @param array $pages Existing pages.
+ * @return array
+ */
+function add_custom_analytics_page( $pages ) {
+    $pages[] = array(
+        'id'       => 'my-custom-report',
+        'title'    => __( 'Custom Report', 'my-extension' ),
+        'parent'   => 'woocommerce-analytics',
+        'path'     => '/analytics/custom-report',
+    );
+    
+    return $pages;
+}
+add_filter( 'woocommerce_analytics_report_menu_items', 'add_custom_analytics_page' );
+```
+
+## Custom Analytics Data Store
+
+Create a custom data store for advanced analytics:
+
+```php
+use Automattic\WooCommerce\Admin\API\Reports\DataStore;
+use Automattic\WooCommerce\Admin\API\Reports\DataStoreInterface;
+
+class Custom_DataStore extends DataStore implements DataStoreInterface {
+    
+    /**
+     * Table name for storing custom data.
+     *
+     * @var string
+     */
+    protected static $table_name = 'wc_custom_analytics';
+    
+    /**
+     * Get the data based on query arguments.
+     *
+     * @param array $query_args Query arguments.
+     * @return array
+     */
+    public function get_data( $query_args ) {
+        global $wpdb;
+        
+        $table_name = $wpdb->prefix . self::$table_name;
+        
+        // Build the query
+        $sql = "SELECT * FROM {$table_name} WHERE 1=1";
+        
+        // Add date filter
+        if ( ! empty( $query_args['after'] ) ) {
+            $sql .= $wpdb->prepare( ' AND date >= %s', $query_args['after'] );
+        }
+        
+        if ( ! empty( $query_args['before'] ) ) {
+            $sql .= $wpdb->prepare( ' AND date <= %s', $query_args['before'] );
+        }
+        
+        // Get results
+        $results = $wpdb->get_results( $sql, ARRAY_A );
+        
+        return array(
+            'data'  => $results,
+            'total' => count( $results ),
+        );
+    }
+}
+```
+
+## Tracking Custom Events
+
+Track custom analytics events:
+
+```php
+/**
+ * Record a custom analytics event.
+ *
+ * @param string $event_type Event type.
+ * @param array  $data       Event data.
+ */
+function record_custom_analytics_event( $event_type, $data ) {
+    global $wpdb;
+    
+    $wpdb->insert(
+        $wpdb->prefix . 'wc_custom_analytics',
+        array(
+            'event_type' => $event_type,
+            'event_data' => wp_json_encode( $data ),
+            'date'       => current_time( 'mysql' ),
+        ),
+        array( '%s', '%s', '%s' )
+    );
+}
+
+// Track when products are added to cart
+add_action( 'woocommerce_add_to_cart', function( $cart_item_key, $product_id, $quantity ) {
+    record_custom_analytics_event( 'add_to_cart', array(
+        'product_id' => $product_id,
+        'quantity'   => $quantity,
+        'user_id'    => get_current_user_id(),
+    ) );
+}, 10, 3 );
+
+// Track abandoned carts
+add_action( 'woocommerce_cart_updated', function() {
+    if ( ! WC()->cart->is_empty() ) {
+        record_custom_analytics_event( 'cart_updated', array(
+            'cart_total' => WC()->cart->get_total( 'raw' ),
+            'item_count' => WC()->cart->get_cart_contents_count(),
+            'user_id'    => get_current_user_id(),
+        ) );
+    }
+} );
+```
+
+## REST API Integration
+
+Access analytics data via REST API:
+
+```php
+/**
+ * Register custom REST API endpoint.
+ */
+add_action( 'rest_api_init', function() {
+    register_rest_route( 'wc-analytics/v1', '/custom-report', array(
+        'methods'             => 'GET',
+        'callback'            => 'get_custom_report_data',
+        'permission_callback' => function() {
+            return current_user_can( 'manage_woocommerce' );
+        },
+    ) );
+} );
+
+/**
+ * Get custom report data.
+ *
+ * @param WP_REST_Request $request Request object.
+ * @return WP_REST_Response
+ */
+function get_custom_report_data( $request ) {
+    $params = $request->get_params();
+    
+    // Query your custom data
+    global $wpdb;
+    $results = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT * FROM {$wpdb->prefix}wc_custom_analytics WHERE date >= %s AND date <= %s",
+            $params['after'],
+            $params['before']
+        ),
+        ARRAY_A
+    );
+    
+    return new WP_REST_Response( array(
+        'data'  => $results,
+        'total' => count( $results ),
+    ), 200 );
+}
+```
+
+## Available Hooks
+
+### JavaScript Hooks
+
+<Accordion title="Report Filters">
+```javascript
+// Available filter hooks
+woocommerce_admin_orders_report_filters
+woocommerce_admin_products_report_filters
+woocommerce_admin_revenue_report_filters
+woocommerce_admin_customers_report_filters
+woocommerce_admin_taxes_report_filters
+```
+</Accordion>
+
+<Accordion title="Report Tables">
+```javascript
+// Modify report table data
+woocommerce_admin_report_table
+
+// Modify report currency
+woocommerce_admin_report_currency
+```
+</Accordion>
+
+### PHP Hooks
+
+<Accordion title="Query Arguments">
+```php
+// Modify query arguments
+woocommerce_analytics_orders_query_args
+woocommerce_analytics_orders_stats_query_args
+woocommerce_analytics_products_query_args
+woocommerce_analytics_customers_query_args
+```
+</Accordion>
+
+<Accordion title="SQL Clauses">
+```php
+// Modify SQL SELECT
+woocommerce_analytics_clauses_select_orders_subquery
+woocommerce_analytics_clauses_select_orders_stats_total
+woocommerce_analytics_clauses_select_orders_stats_interval
+
+// Modify SQL JOIN
+woocommerce_analytics_clauses_join_orders_subquery
+woocommerce_analytics_clauses_join_orders_stats_total
+woocommerce_analytics_clauses_join_orders_stats_interval
+
+// Modify SQL WHERE
+woocommerce_analytics_clauses_where_orders_subquery
+woocommerce_analytics_clauses_where_orders_stats_total
+woocommerce_analytics_clauses_where_orders_stats_interval
+```
+</Accordion>
+
+## Database Tables
+
+WooCommerce Analytics uses these main tables:
+
+- `wp_wc_order_stats` - Order statistics
+- `wp_wc_order_product_lookup` - Product order data
+- `wp_wc_order_tax_lookup` - Tax data
+- `wp_wc_order_coupon_lookup` - Coupon usage
+- `wp_wc_customer_lookup` - Customer data
+
+## Performance Optimization
+
+<Note>
+**Best practices for analytics performance:**
+
+- Use prepared statements for all database queries
+- Add appropriate indexes to custom tables
+- Cache expensive queries using transients
+- Batch process large data imports
+- Use Action Scheduler for background processing
+- Limit date ranges in queries
+</Note>
+
+## Testing Analytics Extensions
+
+<Steps>
+  <Step title="Generate Test Data">
+    Use WooCommerce's built-in test data generators or create sample orders programmatically.
+  </Step>
+  
+  <Step title="Test Filters">
+    Verify UI filters appear correctly and query parameters are passed.
+  </Step>
+  
+  <Step title="Validate SQL">
+    Enable query logging to verify SQL modifications work correctly:
+    
+    ```php
+    define( 'SAVEQUERIES', true );
+    ```
+  </Step>
+  
+  <Step title="Check Performance">
+    Use Query Monitor plugin to identify slow queries.
+  </Step>
+</Steps>
+
+## Common Use Cases
+
+### Product Performance Tracking
+
+Track which products perform best:
+
+```php
+function get_top_products( $date_range = 'last_30_days' ) {
+    global $wpdb;
+    
+    $date_query = wc_admin_date_range_query( $date_range );
+    
+    return $wpdb->get_results(
+        "SELECT product_id, SUM(product_gross_revenue) as revenue, SUM(product_qty) as quantity
+        FROM {$wpdb->prefix}wc_order_product_lookup
+        WHERE {$date_query}
+        GROUP BY product_id
+        ORDER BY revenue DESC
+        LIMIT 10"
+    );
+}
+```
+
+### Customer Lifetime Value
+
+Calculate customer lifetime value:
+
+```php
+function get_customer_lifetime_value( $customer_id ) {
+    global $wpdb;
+    
+    return $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT SUM(total_sales) 
+            FROM {$wpdb->prefix}wc_order_stats
+            WHERE customer_id = %d
+            AND status IN ('wc-completed', 'wc-processing')",
+            $customer_id
+        )
+    );
+}
+```
+
+## Related Resources
+
+- [Adding Columns to Analytics Reports](/docs/features/analytics/adding-columns-to-analytics-reports-and-csv-downloads)
+- [WooCommerce REST API - Reports](https://woocommerce.github.io/woocommerce-rest-api-docs/#reports)
+- [Analytics Database Schema](https://github.com/woocommerce/woocommerce/wiki/Analytics-Database-Schema)

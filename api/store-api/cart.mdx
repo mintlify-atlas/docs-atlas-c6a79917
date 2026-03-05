@@ -1,0 +1,856 @@
+---
+title: Cart API
+description: Manage shopping cart operations including adding items, updating quantities, applying coupons, and managing shipping
+---
+
+# Cart API
+
+The Cart API provides endpoints for managing the shopping cart for the current session or logged-in user. All cart operations return the complete cart state, making it easy to keep your frontend synchronized with the server.
+
+## Overview
+
+The Cart API allows you to:
+
+- Retrieve the current cart state
+- Add and remove items
+- Update item quantities
+- Apply and remove coupons
+- Update customer billing and shipping addresses
+- Select shipping methods
+- Calculate taxes and totals
+
+<Note>
+All POST endpoints require either a [Nonce Token](#authentication) or a [Cart Token](#cart-tokens) for security. GET requests to `/cart` do not require authentication.
+</Note>
+
+## Base Endpoint
+
+All cart endpoints use the base path:
+
+```
+/wp-json/wc/store/v1/cart
+```
+
+## Authentication
+
+### Nonce Tokens
+
+For traditional WordPress applications, use nonce tokens for write operations:
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  https://example-store.com/wp-json/wc/store/v1/cart/add-item
+```
+
+Generate nonces using WordPress:
+
+```php
+$nonce = wp_create_nonce( 'wc_store_api' );
+```
+
+<Warning>
+After each request, an updated `Nonce` header is returned in the response. You must use this updated nonce for subsequent requests or they will fail.
+</Warning>
+
+### Cart Tokens
+
+For headless applications, use Cart Tokens instead of nonces:
+
+```bash
+curl --header "Cart-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  --request GET \
+  https://example-store.com/wp-json/wc/store/v1/cart
+```
+
+Cart Tokens are JWT-based tokens returned in the `Cart-Token` response header when you make any request to a cart endpoint. Store this token and include it in subsequent requests.
+
+**How to obtain a Cart Token:**
+
+1. Make a GET request to `/wc/store/v1/cart`
+2. Extract the `Cart-Token` from response headers
+3. Use this token for all future cart and checkout operations
+
+```javascript
+const response = await fetch('https://example-store.com/wp-json/wc/store/v1/cart');
+const cartToken = response.headers.get('Cart-Token');
+localStorage.setItem('cartToken', cartToken);
+```
+
+<Note>
+When using Cart Tokens, nonce tokens are not required. This makes them ideal for headless implementations where cookies are not available.
+</Note>
+
+## Get Cart
+
+Retrieve the current cart state including items, totals, shipping rates, and applied coupons.
+
+```http
+GET /wp-json/wc/store/v1/cart
+```
+
+### Request
+
+```bash
+curl "https://example-store.com/wp-json/wc/store/v1/cart"
+```
+
+### Response
+
+<CodeGroup>
+```json 200 OK
+{
+  "items": [
+    {
+      "key": "a5771bce93e200c36f7cd9dfd0e5deaa",
+      "id": 38,
+      "quantity": 1,
+      "quantity_limits": {
+        "minimum": 1,
+        "maximum": 9999,
+        "multiple_of": 1,
+        "editable": true
+      },
+      "name": "Beanie with Logo",
+      "short_description": "<p>This is a simple product.</p>",
+      "description": "<p>Classic beanie with embroidered logo...</p>",
+      "sku": "Woo-beanie-logo",
+      "low_stock_remaining": null,
+      "backorders_allowed": false,
+      "show_backorder_badge": false,
+      "sold_individually": false,
+      "permalink": "https://example-store.com/product/beanie-with-logo/",
+      "images": [
+        {
+          "id": 61,
+          "src": "https://example-store.com/wp-content/uploads/beanie-with-logo-1.jpg",
+          "thumbnail": "https://example-store.com/wp-content/uploads/beanie-with-logo-1-450x450.jpg",
+          "name": "beanie-with-logo-1.jpg",
+          "alt": "Red beanie with white logo"
+        }
+      ],
+      "variation": [],
+      "item_data": [],
+      "prices": {
+        "price": "1800",
+        "regular_price": "2000",
+        "sale_price": "1800",
+        "price_range": null,
+        "currency_code": "USD",
+        "currency_symbol": "$",
+        "currency_minor_unit": 2,
+        "currency_decimal_separator": ".",
+        "currency_thousand_separator": ",",
+        "currency_prefix": "$",
+        "currency_suffix": "",
+        "raw_prices": {
+          "precision": 6,
+          "price": "18000000",
+          "regular_price": "20000000",
+          "sale_price": "18000000"
+        }
+      },
+      "totals": {
+        "line_subtotal": "1800",
+        "line_subtotal_tax": "180",
+        "line_total": "1530",
+        "line_total_tax": "153",
+        "currency_code": "USD",
+        "currency_symbol": "$",
+        "currency_minor_unit": 2,
+        "currency_decimal_separator": ".",
+        "currency_thousand_separator": ",",
+        "currency_prefix": "$",
+        "currency_suffix": ""
+      },
+      "catalog_visibility": "visible",
+      "extensions": {}
+    }
+  ],
+  "coupons": [
+    {
+      "code": "SUMMER15",
+      "discount_type": "percent",
+      "totals": {
+        "total_discount": "270",
+        "total_discount_tax": "27",
+        "currency_code": "USD",
+        "currency_symbol": "$",
+        "currency_minor_unit": 2,
+        "currency_decimal_separator": ".",
+        "currency_thousand_separator": ",",
+        "currency_prefix": "$",
+        "currency_suffix": ""
+      }
+    }
+  ],
+  "fees": [],
+  "totals": {
+    "total_items": "1800",
+    "total_items_tax": "180",
+    "total_fees": "0",
+    "total_fees_tax": "0",
+    "total_discount": "270",
+    "total_discount_tax": "27",
+    "total_shipping": "1000",
+    "total_shipping_tax": "100",
+    "total_price": "2783",
+    "total_tax": "253",
+    "tax_lines": [
+      {
+        "name": "Tax",
+        "price": "253",
+        "rate": "10%"
+      }
+    ],
+    "currency_code": "USD",
+    "currency_symbol": "$",
+    "currency_minor_unit": 2,
+    "currency_decimal_separator": ".",
+    "currency_thousand_separator": ",",
+    "currency_prefix": "$",
+    "currency_suffix": ""
+  },
+  "shipping_address": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "company": "",
+    "address_1": "123 Main Street",
+    "address_2": "Apt 4B",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10001",
+    "country": "US",
+    "phone": "555-1234"
+  },
+  "billing_address": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "company": "",
+    "address_1": "123 Main Street",
+    "address_2": "Apt 4B",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10001",
+    "country": "US",
+    "email": "john.doe@example.com",
+    "phone": "555-1234"
+  },
+  "needs_payment": true,
+  "needs_shipping": true,
+  "payment_requirements": ["products"],
+  "has_calculated_shipping": true,
+  "shipping_rates": [
+    {
+      "package_id": 0,
+      "name": "Shipping",
+      "destination": {
+        "address_1": "123 Main Street",
+        "address_2": "Apt 4B",
+        "city": "New York",
+        "state": "NY",
+        "postcode": "10001",
+        "country": "US"
+      },
+      "items": [
+        {
+          "key": "a5771bce93e200c36f7cd9dfd0e5deaa",
+          "name": "Beanie with Logo",
+          "quantity": 1
+        }
+      ],
+      "shipping_rates": [
+        {
+          "rate_id": "flat_rate:1",
+          "name": "Flat rate",
+          "description": "",
+          "delivery_time": "",
+          "price": "1000",
+          "taxes": "100",
+          "instance_id": 1,
+          "method_id": "flat_rate",
+          "meta_data": [],
+          "selected": true,
+          "currency_code": "USD",
+          "currency_symbol": "$",
+          "currency_minor_unit": 2
+        },
+        {
+          "rate_id": "free_shipping:2",
+          "name": "Free shipping",
+          "description": "Free shipping on orders over $50",
+          "delivery_time": "",
+          "price": "0",
+          "taxes": "0",
+          "instance_id": 2,
+          "method_id": "free_shipping",
+          "meta_data": [],
+          "selected": false,
+          "currency_code": "USD",
+          "currency_symbol": "$",
+          "currency_minor_unit": 2
+        }
+      ]
+    }
+  ],
+  "items_count": 1,
+  "items_weight": 0.5,
+  "cross_sells": [],
+  "errors": [],
+  "payment_methods": ["bacs", "cheque", "cod"],
+  "extensions": {}
+}
+```
+</CodeGroup>
+
+### Response Fields
+
+<ResponseField name="items" type="array">
+  Array of cart items with product details, quantities, and pricing
+  
+  <Expandable title="Cart Item Fields">
+    <ResponseField name="key" type="string">
+      Unique cart item key (MD5 hash)
+    </ResponseField>
+    <ResponseField name="id" type="integer">
+      Product or variation ID
+    </ResponseField>
+    <ResponseField name="quantity" type="integer">
+      Quantity of this item in cart
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Product name
+    </ResponseField>
+    <ResponseField name="prices" type="object">
+      Price information including regular, sale, and currency data
+    </ResponseField>
+    <ResponseField name="totals" type="object">
+      Line totals including subtotal, tax, and discount
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="coupons" type="array">
+  Applied coupon codes and their discount amounts
+</ResponseField>
+
+<ResponseField name="totals" type="object">
+  Cart totals including items, fees, shipping, taxes, and discounts
+</ResponseField>
+
+<ResponseField name="shipping_address" type="object">
+  Customer shipping address
+</ResponseField>
+
+<ResponseField name="billing_address" type="object">
+  Customer billing address (includes email)
+</ResponseField>
+
+<ResponseField name="shipping_rates" type="array">
+  Available shipping methods for each package
+</ResponseField>
+
+<ResponseField name="needs_payment" type="boolean">
+  Whether cart requires payment
+</ResponseField>
+
+<ResponseField name="needs_shipping" type="boolean">
+  Whether cart requires shipping
+</ResponseField>
+
+## Add Item to Cart
+
+Add a product or variation to the cart.
+
+```http
+POST /wp-json/wc/store/v1/cart/add-item
+```
+
+### Parameters
+
+<ParamField path="id" type="integer" required>
+  The product or variation ID to add to cart
+</ParamField>
+
+<ParamField path="quantity" type="integer" required>
+  Quantity to add (must be at least 1)
+</ParamField>
+
+<ParamField path="variation" type="array">
+  For variable products, an array of attribute objects with `attribute` and `value` keys
+</ParamField>
+
+### Request
+
+<CodeGroup>
+```bash Simple Product
+curl --header "Nonce: 12345" \
+  --request POST \
+  "https://example-store.com/wp-json/wc/store/v1/cart/add-item?id=100&quantity=2"
+```
+
+```bash Variable Product
+curl --header "Nonce: 12345" \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{
+    "id": 150,
+    "quantity": 1,
+    "variation": [
+      {
+        "attribute": "pa_color",
+        "value": "blue"
+      },
+      {
+        "attribute": "pa_size",
+        "value": "large"
+      }
+    ]
+  }' \
+  "https://example-store.com/wp-json/wc/store/v1/cart/add-item"
+```
+
+```javascript Fetch API
+const response = await fetch('/wp-json/wc/store/v1/cart/add-item', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Nonce': nonce
+  },
+  body: JSON.stringify({
+    id: 100,
+    quantity: 1,
+    variation: [
+      { attribute: 'pa_color', value: 'red' },
+      { attribute: 'pa_size', value: 'medium' }
+    ]
+  })
+});
+
+const cart = await response.json();
+const updatedNonce = response.headers.get('Nonce');
+```
+</CodeGroup>
+
+### Variation Attribute Naming
+
+When adding variations, attribute naming is important:
+
+**Global Attributes** use slugs with `pa_` prefix:
+- Attribute "Color" → `pa_color`
+- Attribute "Size" → `pa_size`
+
+**Product-Specific Attributes** can use either:
+- The attribute name (case-sensitive): `Size`, `Autograph ✏️`
+- The attribute slug: `attribute_size`, `attribute_autograph-%e2%9c%8f%ef%b8%8f`
+
+### Response
+
+Returns the full cart object (same as [Get Cart](#get-cart)) on success.
+
+<CodeGroup>
+```json 201 Created
+{
+  "items": [
+    {
+      "key": "c74d97b01eae257e44aa9d5bade97baf",
+      "id": 100,
+      "quantity": 2,
+      "name": "Premium T-Shirt",
+      ...
+    }
+  ],
+  "totals": { ... },
+  ...
+}
+```
+
+```json 400 Error - Invalid Product
+{
+  "code": "woocommerce_rest_cart_invalid_product",
+  "message": "This product cannot be added to the cart.",
+  "data": {
+    "status": 400
+  }
+}
+```
+</CodeGroup>
+
+### Adding Multiple Items (Batch)
+
+To add multiple items in one request, use the batch endpoint:
+
+```bash
+POST /wp-json/wc/store/v1/batch
+```
+
+```json
+{
+  "requests": [
+    {
+      "path": "/wc/store/v1/cart/add-item",
+      "method": "POST",
+      "body": { "id": 26, "quantity": 1 },
+      "headers": { "Nonce": "1db1d13784" }
+    },
+    {
+      "path": "/wc/store/v1/cart/add-item",
+      "method": "POST",
+      "body": { "id": 27, "quantity": 2 },
+      "headers": { "Nonce": "1db1d13784" }
+    }
+  ]
+}
+```
+
+## Update Item Quantity
+
+Update the quantity of an existing cart item.
+
+```http
+POST /wp-json/wc/store/v1/cart/update-item
+```
+
+### Parameters
+
+<ParamField path="key" type="string" required>
+  The cart item key (from cart response)
+</ParamField>
+
+<ParamField path="quantity" type="integer" required>
+  New quantity (set to 0 to remove item)
+</ParamField>
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  "https://example-store.com/wp-json/wc/store/v1/cart/update-item?key=e369853df766fa44e1ed0ff613f563bd&quantity=5"
+```
+
+### Response
+
+Returns the full cart object with updated quantities and totals.
+
+## Remove Item from Cart
+
+Remove a specific item from the cart.
+
+```http
+POST /wp-json/wc/store/v1/cart/remove-item
+```
+
+### Parameters
+
+<ParamField path="key" type="string" required>
+  The cart item key to remove
+</ParamField>
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  "https://example-store.com/wp-json/wc/store/v1/cart/remove-item?key=e369853df766fa44e1ed0ff613f563bd"
+```
+
+### Response
+
+Returns the full cart object without the removed item.
+
+## Apply Coupon
+
+Apply a discount coupon to the cart.
+
+```http
+POST /wp-json/wc/store/v1/cart/apply-coupon
+```
+
+### Parameters
+
+<ParamField path="code" type="string" required>
+  The coupon code to apply
+</ParamField>
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  "https://example-store.com/wp-json/wc/store/v1/cart/apply-coupon?code=SUMMER15"
+```
+
+### Response
+
+<CodeGroup>
+```json 201 Created
+{
+  "items": [ ... ],
+  "coupons": [
+    {
+      "code": "SUMMER15",
+      "discount_type": "percent",
+      "totals": {
+        "total_discount": "450",
+        "total_discount_tax": "45",
+        "currency_code": "USD",
+        "currency_symbol": "$",
+        "currency_minor_unit": 2
+      }
+    }
+  ],
+  "totals": {
+    "total_discount": "450",
+    "total_discount_tax": "45",
+    ...
+  }
+}
+```
+
+```json 400 Error - Invalid Coupon
+{
+  "code": "woocommerce_rest_cart_coupon_error",
+  "message": "Coupon is not valid.",
+  "data": {
+    "status": 400
+  }
+}
+```
+</CodeGroup>
+
+## Remove Coupon
+
+Remove a previously applied coupon from the cart.
+
+```http
+POST /wp-json/wc/store/v1/cart/remove-coupon
+```
+
+### Parameters
+
+<ParamField path="code" type="string" required>
+  The coupon code to remove
+</ParamField>
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  "https://example-store.com/wp-json/wc/store/v1/cart/remove-coupon?code=SUMMER15"
+```
+
+### Response
+
+Returns the full cart object with updated totals reflecting the removed coupon.
+
+## Update Customer Address
+
+Update customer billing and shipping addresses. This recalculates shipping rates and taxes.
+
+```http
+POST /wp-json/wc/store/v1/cart/update-customer
+```
+
+### Parameters
+
+<ParamField path="billing_address" type="object">
+  Customer billing address object
+  
+  <Expandable title="Billing Address Fields">
+    <ParamField path="first_name" type="string">First name</ParamField>
+    <ParamField path="last_name" type="string">Last name</ParamField>
+    <ParamField path="company" type="string">Company name</ParamField>
+    <ParamField path="address_1" type="string">Street address line 1</ParamField>
+    <ParamField path="address_2" type="string">Street address line 2</ParamField>
+    <ParamField path="city" type="string">City</ParamField>
+    <ParamField path="state" type="string">State/province code</ParamField>
+    <ParamField path="postcode" type="string">ZIP/postal code</ParamField>
+    <ParamField path="country" type="string">Country code (ISO 3166-1 alpha-2)</ParamField>
+    <ParamField path="email" type="string">Email address</ParamField>
+    <ParamField path="phone" type="string">Phone number</ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="shipping_address" type="object">
+  Customer shipping address object (same fields as billing, except no email)
+</ParamField>
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{
+    "billing_address": {
+      "first_name": "Jane",
+      "last_name": "Smith",
+      "address_1": "456 Oak Avenue",
+      "city": "Los Angeles",
+      "state": "CA",
+      "postcode": "90001",
+      "country": "US",
+      "email": "jane.smith@example.com",
+      "phone": "555-9876"
+    },
+    "shipping_address": {
+      "first_name": "Jane",
+      "last_name": "Smith",
+      "address_1": "456 Oak Avenue",
+      "city": "Los Angeles",
+      "state": "CA",
+      "postcode": "90001",
+      "country": "US"
+    }
+  }' \
+  "https://example-store.com/wp-json/wc/store/v1/cart/update-customer"
+```
+
+### Response
+
+Returns the full cart object with updated addresses, shipping rates, and tax calculations.
+
+## Select Shipping Rate
+
+Choose a shipping method for a package in the cart.
+
+```http
+POST /wp-json/wc/store/v1/cart/select-shipping-rate
+```
+
+### Parameters
+
+<ParamField path="package_id" type="integer" required>
+  The package ID (usually 0 for single-package carts)
+</ParamField>
+
+<ParamField path="rate_id" type="string" required>
+  The shipping rate ID (e.g., "flat_rate:1", "free_shipping:2")
+</ParamField>
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request POST \
+  "https://example-store.com/wp-json/wc/store/v1/cart/select-shipping-rate?package_id=0&rate_id=flat_rate:1"
+```
+
+### Response
+
+Returns the full cart object with the selected shipping method and updated totals.
+
+## Error Responses
+
+### Standard Error
+
+```json
+{
+  "code": "woocommerce_rest_cart_invalid_product",
+  "message": "This product cannot be added to the cart.",
+  "data": {
+    "status": 400
+  }
+}
+```
+
+### Conflict Error (409)
+
+When cart state changes during a request, a 409 response includes the current cart:
+
+```json
+{
+  "code": "woocommerce_rest_cart_invalid_key",
+  "message": "Cart item no longer exists or is invalid.",
+  "data": {
+    "status": 409,
+    "cart": {
+      "items": [],
+      "coupons": [],
+      "totals": { ... },
+      ...
+    }
+  }
+}
+```
+
+This allows your application to synchronize with the server without an additional request.
+
+## Common Error Codes
+
+| Code | Description |
+|------|-------------|
+| `woocommerce_rest_cart_invalid_product` | Product cannot be added (out of stock, invalid, etc.) |
+| `woocommerce_rest_cart_invalid_key` | Cart item key doesn't exist or is invalid |
+| `woocommerce_rest_cart_coupon_error` | Coupon is invalid or cannot be applied |
+| `woocommerce_rest_invalid_nonce` | Nonce token is invalid or expired |
+| `woocommerce_rest_missing_nonce` | Nonce token is required but not provided |
+
+## Understanding Price Fields
+
+Prices in the Store API are returned as **strings representing the smallest currency unit** (e.g., cents for USD):
+
+```json
+{
+  "prices": {
+    "price": "1800",           // $18.00
+    "regular_price": "2000",   // $20.00
+    "sale_price": "1800",      // $18.00
+    "currency_code": "USD",
+    "currency_symbol": "$",
+    "currency_minor_unit": 2,  // 2 decimal places
+    "currency_prefix": "$",
+    "currency_suffix": ""
+  }
+}
+```
+
+To display the price correctly:
+
+```javascript
+const priceValue = parseInt(cart.items[0].prices.price);
+const minorUnit = cart.items[0].prices.currency_minor_unit;
+const displayPrice = (priceValue / Math.pow(10, minorUnit)).toFixed(minorUnit);
+// displayPrice = "18.00"
+```
+
+## Cart Item Keys
+
+Each cart item has a unique `key` (MD5 hash) based on:
+- Product ID
+- Variation ID (if applicable)
+- Variation attributes
+- Custom cart item data
+
+The same product with different attributes will have different keys, allowing multiple variations of the same product in the cart.
+
+## Extensions
+
+The `extensions` object in responses can contain additional data added by plugins:
+
+```json
+{
+  "items": [ ... ],
+  "extensions": {
+    "my-plugin": {
+      "custom_data": "value"
+    }
+  }
+}
+```
+
+Plugins can extend cart data using the WooCommerce Store API extensibility system.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Checkout API" icon="credit-card" href="/api/store-api/checkout">
+    Learn how to process checkout and create orders
+  </Card>
+  
+  <Card title="Store API Overview" icon="store" href="/api/store-api/overview">
+    Back to Store API introduction
+  </Card>
+</CardGroup>

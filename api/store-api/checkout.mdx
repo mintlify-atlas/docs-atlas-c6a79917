@@ -1,0 +1,854 @@
+---
+title: Checkout API
+description: Process checkout, collect customer information, handle payments, and create orders
+---
+
+# Checkout API
+
+The Checkout API enables you to convert shopping carts into orders, collect customer information, and process payments. It provides a complete checkout flow for headless and traditional WooCommerce implementations.
+
+## Overview
+
+The Checkout API allows you to:
+
+- Retrieve checkout session data
+- Update customer billing and shipping information
+- Select payment methods
+- Add order notes and custom fields
+- Process payment and create orders
+- Handle payment gateway integration
+
+<Warning>
+All checkout endpoints require either a [Nonce Token](#authentication) or a [Cart Token](#cart-tokens) for security. Checkout operations will fail without proper authentication.
+</Warning>
+
+## Base Endpoint
+
+All checkout endpoints use the base path:
+
+```
+/wp-json/wc/store/v1/checkout
+```
+
+## Authentication
+
+### Nonce Tokens
+
+Checkout requires valid nonce tokens for all requests:
+
+```bash
+curl --header "Nonce: 12345" \
+  --request GET \
+  https://example-store.com/wp-json/wc/store/v1/checkout
+```
+
+Generate nonces using:
+
+```php
+$nonce = wp_create_nonce( 'wc_store_api' );
+```
+
+<Note>
+The nonce is updated with each response. Always use the latest nonce from the response headers for your next request.
+</Note>
+
+### Cart Tokens
+
+For headless implementations, use Cart Tokens:
+
+```bash
+curl --header "Cart-Token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." \
+  --request POST \
+  https://example-store.com/wp-json/wc/store/v1/checkout
+```
+
+Cart Tokens eliminate the need for nonces in headless environments.
+
+## Get Checkout Data
+
+Retrieve the current checkout session, including a draft order created from the cart.
+
+```http
+GET /wp-json/wc/store/v1/checkout
+```
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request GET \
+  "https://example-store.com/wp-json/wc/store/v1/checkout"
+```
+
+### Response
+
+<CodeGroup>
+```json 200 OK
+{
+  "order_id": 146,
+  "status": "checkout-draft",
+  "order_key": "wc_order_VPffqyvgWVqWL",
+  "order_number": "146",
+  "customer_note": "",
+  "customer_id": 1,
+  "billing_address": {
+    "first_name": "Peter",
+    "last_name": "Venkman",
+    "company": "",
+    "address_1": "550 Central Park West",
+    "address_2": "Corner Penthouse Spook Central",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10023",
+    "country": "US",
+    "email": "admin@example.com",
+    "phone": "555-2368"
+  },
+  "shipping_address": {
+    "first_name": "Peter",
+    "last_name": "Venkman",
+    "company": "",
+    "address_1": "550 Central Park West",
+    "address_2": "Corner Penthouse Spook Central",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10023",
+    "country": "US"
+  },
+  "payment_method": "",
+  "payment_result": {
+    "payment_status": "",
+    "payment_details": [],
+    "redirect_url": ""
+  },
+  "additional_fields": {}
+}
+```
+</CodeGroup>
+
+### Response Fields
+
+<ResponseField name="order_id" type="integer">
+  Draft order ID created from the cart
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Order status (typically `checkout-draft` until payment is processed)
+</ResponseField>
+
+<ResponseField name="order_key" type="string">
+  Unique order key for verification
+</ResponseField>
+
+<ResponseField name="billing_address" type="object">
+  Customer billing address with email and phone
+</ResponseField>
+
+<ResponseField name="shipping_address" type="object">
+  Customer shipping address
+</ResponseField>
+
+<ResponseField name="payment_method" type="string">
+  Selected payment method ID (empty until selected)
+</ResponseField>
+
+<ResponseField name="payment_result" type="object">
+  Payment processing results (populated after POST request)
+</ResponseField>
+
+<ResponseField name="additional_fields" type="object">
+  Custom fields added by plugins or themes
+</ResponseField>
+
+## Update Checkout Data
+
+Update checkout information without processing payment. This is useful for persisting checkout fields as the customer fills them out.
+
+```http
+PUT /wp-json/wc/store/v1/checkout
+```
+
+### Parameters
+
+<ParamField path="payment_method" type="string">
+  The ID of the selected payment method (e.g., "bacs", "cheque", "stripe")
+</ParamField>
+
+<ParamField path="order_notes" type="string">
+  Customer notes for the order
+</ParamField>
+
+<ParamField path="additional_fields" type="object">
+  Custom fields with namespace/key structure (e.g., `plugin-namespace/field-name`)
+</ParamField>
+
+<ParamField path="__experimental_calc_totals" type="boolean">
+  Set to `true` to recalculate cart totals (default: false)
+</ParamField>
+
+### Request
+
+```bash
+curl --header "Nonce: 12345" \
+  --request PUT \
+  --header "Content-Type: application/json" \
+  --data '{
+    "payment_method": "bacs",
+    "order_notes": "Please leave package on back porch",
+    "additional_fields": {
+      "plugin-namespace/delivery-instructions": "Call on arrival"
+    }
+  }' \
+  "https://example-store.com/wp-json/wc/store/v1/checkout?__experimental_calc_totals=true"
+```
+
+### Response
+
+<CodeGroup>
+```json 200 OK
+{
+  "order_id": 1486,
+  "status": "checkout-draft",
+  "order_key": "wc_order_KLpMaJ054PVlb",
+  "order_number": "1486",
+  "customer_note": "Please leave package on back porch",
+  "customer_id": 1,
+  "billing_address": {
+    "first_name": "Peter",
+    "last_name": "Venkman",
+    "company": "",
+    "address_1": "550 Central Park West",
+    "address_2": "Corner Penthouse Spook Central",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10023",
+    "country": "US",
+    "email": "admin@example.com",
+    "phone": "555-2368"
+  },
+  "shipping_address": {
+    "first_name": "Peter",
+    "last_name": "Venkman",
+    "company": "",
+    "address_1": "550 Central Park West",
+    "address_2": "Corner Penthouse Spook Central",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10023",
+    "country": "US"
+  },
+  "payment_method": "bacs",
+  "payment_result": null,
+  "additional_fields": {
+    "plugin-namespace/delivery-instructions": "Call on arrival"
+  },
+  "__experimentalCart": {
+    "items": [ ... ],
+    "totals": { ... }
+  },
+  "extensions": {}
+}
+```
+</CodeGroup>
+
+<Note>
+The `__experimentalCart` field is included when `__experimental_calc_totals=true`, allowing you to update the cart UI based on checkout changes without an additional request.
+</Note>
+
+## Process Order and Payment
+
+Submit final checkout data and process payment to create an order.
+
+```http
+POST /wp-json/wc/store/v1/checkout
+```
+
+### Parameters
+
+<ParamField path="billing_address" type="object" required>
+  Complete billing address object
+  
+  <Expandable title="Billing Address Fields">
+    <ParamField path="first_name" type="string" required>First name</ParamField>
+    <ParamField path="last_name" type="string" required>Last name</ParamField>
+    <ParamField path="company" type="string">Company name</ParamField>
+    <ParamField path="address_1" type="string" required>Street address</ParamField>
+    <ParamField path="address_2" type="string">Apartment, suite, etc.</ParamField>
+    <ParamField path="city" type="string" required>City</ParamField>
+    <ParamField path="state" type="string" required>State/province code</ParamField>
+    <ParamField path="postcode" type="string" required>ZIP/postal code</ParamField>
+    <ParamField path="country" type="string" required>Country code (ISO 3166-1 alpha-2)</ParamField>
+    <ParamField path="email" type="string" required>Email address</ParamField>
+    <ParamField path="phone" type="string">Phone number</ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField path="shipping_address" type="object" required>
+  Complete shipping address object (same fields as billing except no email)
+</ParamField>
+
+<ParamField path="payment_method" type="string" required>
+  Payment method ID (e.g., "bacs", "cheque", "stripe", "paypal")
+</ParamField>
+
+<ParamField path="payment_data" type="array">
+  Payment-specific data required by the payment gateway (structure varies by gateway)
+</ParamField>
+
+<ParamField path="customer_note" type="string">
+  Order notes from the customer
+</ParamField>
+
+<ParamField path="customer_password" type="string">
+  Password for new account creation (if enabled)
+</ParamField>
+
+<ParamField path="create_account" type="boolean">
+  Whether to create a new customer account
+</ParamField>
+
+<ParamField path="extensions" type="object">
+  Extension-specific data
+</ParamField>
+
+### Request
+
+<CodeGroup>
+```bash Basic Payment
+curl --header "Nonce: 12345" \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{
+    "billing_address": {
+      "first_name": "Peter",
+      "last_name": "Venkman",
+      "company": "",
+      "address_1": "550 Central Park West",
+      "address_2": "Corner Penthouse Spook Central",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10023",
+      "country": "US",
+      "email": "admin@example.com",
+      "phone": "555-2368"
+    },
+    "shipping_address": {
+      "first_name": "Peter",
+      "last_name": "Venkman",
+      "company": "",
+      "address_1": "550 Central Park West",
+      "address_2": "Corner Penthouse Spook Central",
+      "city": "New York",
+      "state": "NY",
+      "postcode": "10023",
+      "country": "US"
+    },
+    "customer_note": "Test notes on order.",
+    "payment_method": "cheque",
+    "payment_data": []
+  }' \
+  "https://example-store.com/wp-json/wc/store/v1/checkout"
+```
+
+```javascript React Example
+async function processCheckout(checkoutData) {
+  const response = await fetch('/wp-json/wc/store/v1/checkout', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Nonce': nonce
+    },
+    body: JSON.stringify({
+      billing_address: {
+        first_name: checkoutData.firstName,
+        last_name: checkoutData.lastName,
+        address_1: checkoutData.address,
+        city: checkoutData.city,
+        state: checkoutData.state,
+        postcode: checkoutData.zip,
+        country: checkoutData.country,
+        email: checkoutData.email,
+        phone: checkoutData.phone
+      },
+      shipping_address: {
+        first_name: checkoutData.shippingFirstName,
+        last_name: checkoutData.shippingLastName,
+        address_1: checkoutData.shippingAddress,
+        city: checkoutData.shippingCity,
+        state: checkoutData.shippingState,
+        postcode: checkoutData.shippingZip,
+        country: checkoutData.shippingCountry
+      },
+      payment_method: checkoutData.paymentMethod,
+      customer_note: checkoutData.orderNotes
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message);
+  }
+
+  return await response.json();
+}
+```
+</CodeGroup>
+
+### Response
+
+<CodeGroup>
+```json 200 OK - Success
+{
+  "order_id": 146,
+  "status": "on-hold",
+  "order_key": "wc_order_VPffqyvgWVqWL",
+  "order_number": "146",
+  "customer_note": "Test notes on order.",
+  "customer_id": 1,
+  "billing_address": {
+    "first_name": "Peter",
+    "last_name": "Venkman",
+    "company": "",
+    "address_1": "550 Central Park West",
+    "address_2": "Corner Penthouse Spook Central",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10023",
+    "country": "US",
+    "email": "admin@example.com",
+    "phone": "555-2368"
+  },
+  "shipping_address": {
+    "first_name": "Peter",
+    "last_name": "Venkman",
+    "company": "",
+    "address_1": "550 Central Park West",
+    "address_2": "Corner Penthouse Spook Central",
+    "city": "New York",
+    "state": "NY",
+    "postcode": "10023",
+    "country": "US"
+  },
+  "payment_method": "cheque",
+  "payment_result": {
+    "payment_status": "success",
+    "payment_details": [],
+    "redirect_url": "https://example-store.com/checkout/order-received/146/?key=wc_order_VPffqyvgWVqWL"
+  }
+}
+```
+
+```json 400 Error - Validation Failed
+{
+  "code": "woocommerce_rest_checkout_invalid_address",
+  "message": "Invalid billing address provided.",
+  "data": {
+    "status": 400,
+    "params": {
+      "billing_address.email": "Invalid email address"
+    }
+  }
+}
+```
+
+```json 400 Error - Payment Failed
+{
+  "code": "woocommerce_rest_checkout_payment_error",
+  "message": "Payment processing failed. Please try again.",
+  "data": {
+    "status": 400
+  }
+}
+```
+</CodeGroup>
+
+### Payment Result Object
+
+<ResponseField name="payment_status" type="string">
+  Payment outcome: "success", "failure", "pending", or "error"
+</ResponseField>
+
+<ResponseField name="payment_details" type="array">
+  Additional payment information from the gateway
+</ResponseField>
+
+<ResponseField name="redirect_url" type="string">
+  URL to redirect customer after successful checkout (typically order confirmation page)
+</ResponseField>
+
+## Checkout Flow
+
+<Steps>
+  <Step title="Initialize Checkout">
+    Make a GET request to retrieve the checkout session and pre-fill customer data
+    
+    ```bash
+    GET /wc/store/v1/checkout
+    ```
+  </Step>
+  
+  <Step title="Collect Information">
+    Display checkout form to collect:
+    - Billing address
+    - Shipping address
+    - Payment method selection
+    - Order notes
+    - Custom fields
+  </Step>
+  
+  <Step title="Validate and Update">
+    Optionally use PUT requests to persist data and validate fields as the customer fills out the form
+    
+    ```bash
+    PUT /wc/store/v1/checkout?__experimental_calc_totals=true
+    ```
+  </Step>
+  
+  <Step title="Process Payment">
+    Submit final checkout with POST request
+    
+    ```bash
+    POST /wc/store/v1/checkout
+    ```
+  </Step>
+  
+  <Step title="Handle Response">
+    - On success: Redirect to `payment_result.redirect_url`
+    - On failure: Display error message and allow retry
+  </Step>
+</Steps>
+
+## Payment Gateway Integration
+
+Different payment gateways require different `payment_data` structures. Always consult the payment gateway's documentation for specific requirements.
+
+### Example: Stripe Payment Gateway
+
+The [WooCommerce Stripe Payment Gateway](https://wordpress.org/plugins/woocommerce-gateway-stripe/) expects:
+
+```json
+{
+  "payment_method": "stripe",
+  "payment_data": [
+    {
+      "key": "stripe_source",
+      "value": "src_xxxxxxxxxxxxx"
+    },
+    {
+      "key": "billing_email",
+      "value": "customer@example.com"
+    },
+    {
+      "key": "billing_first_name",
+      "value": "Jane"
+    },
+    {
+      "key": "billing_last_name",
+      "value": "Doe"
+    },
+    {
+      "key": "paymentMethod",
+      "value": "stripe"
+    },
+    {
+      "key": "paymentRequestType",
+      "value": "cc"
+    },
+    {
+      "key": "wc-stripe-new-payment-method",
+      "value": true
+    }
+  ]
+}
+```
+
+The `stripe_source` is generated using the [Stripe JavaScript SDK](https://stripe.com/docs/js):
+
+```javascript
+// Create Stripe source
+const { source, error } = await stripe.createSource({
+  type: 'card',
+  card: cardElement,
+  owner: {
+    name: billingData.firstName + ' ' + billingData.lastName,
+    email: billingData.email
+  }
+});
+
+if (error) {
+  // Handle error
+} else {
+  // Add source.id to payment_data
+  paymentData.push({
+    key: 'stripe_source',
+    value: source.id
+  });
+}
+```
+
+### Example: PayPal
+
+PayPal integration typically involves:
+
+1. Generate PayPal order ID client-side
+2. Include PayPal order ID in `payment_data`
+3. Gateway validates and captures payment
+
+```json
+{
+  "payment_method": "paypal",
+  "payment_data": [
+    {
+      "key": "paypal_order_id",
+      "value": "1AB23456CD789012E"
+    }
+  ]
+}
+```
+
+### Standard Payment Methods
+
+WooCommerce includes built-in payment methods that don't require additional `payment_data`:
+
+- `bacs` - Direct bank transfer
+- `cheque` - Check payments
+- `cod` - Cash on delivery
+
+```json
+{
+  "payment_method": "bacs",
+  "payment_data": []
+}
+```
+
+## Additional Fields
+
+Plugins can add custom checkout fields using the `additional_fields` parameter:
+
+```json
+{
+  "additional_fields": {
+    "plugin-namespace/gift-message": "Happy Birthday!",
+    "plugin-namespace/gift-wrap": true,
+    "plugin-namespace/delivery-date": "2024-12-25"
+  }
+}
+```
+
+Fields must use namespaced keys (plugin-namespace/field-name) to avoid conflicts.
+
+### Registering Custom Fields
+
+Plugin developers can register custom checkout fields:
+
+```php
+use Automattic\WooCommerce\Blocks\Package;
+use Automattic\WooCommerce\Blocks\Domain\Services\CheckoutFields;
+
+add_action('woocommerce_blocks_loaded', function() {
+  $checkout_fields = Package::container()->get(CheckoutFields::class);
+  
+  $checkout_fields->register_checkout_field([
+    'id' => 'plugin-namespace/gift-message',
+    'label' => 'Gift message',
+    'location' => 'order',
+    'type' => 'text',
+    'required' => false,
+  ]);
+});
+```
+
+## Error Handling
+
+### Common Error Codes
+
+| Code | Description |
+|------|-------------|
+| `woocommerce_rest_checkout_invalid_address` | Billing or shipping address validation failed |
+| `woocommerce_rest_checkout_payment_error` | Payment processing failed |
+| `woocommerce_rest_checkout_missing_payment_method` | No payment method selected |
+| `woocommerce_rest_invalid_nonce` | Nonce token is invalid or expired |
+| `woocommerce_rest_checkout_cart_empty` | Cannot checkout with empty cart |
+| `woocommerce_rest_checkout_invalid_cart` | Cart contains invalid items |
+
+### Handling Validation Errors
+
+Validation errors include field-specific details in `data.params`:
+
+```json
+{
+  "code": "woocommerce_rest_checkout_invalid_address",
+  "message": "Invalid billing address provided.",
+  "data": {
+    "status": 400,
+    "params": {
+      "billing_address.email": "Invalid email address",
+      "billing_address.postcode": "Postcode is required"
+    }
+  }
+}
+```
+
+Display these errors next to the relevant form fields:
+
+```javascript
+try {
+  const order = await processCheckout(formData);
+  window.location.href = order.payment_result.redirect_url;
+} catch (error) {
+  const errorData = await error.response.json();
+  
+  if (errorData.data?.params) {
+    // Display field-specific errors
+    Object.keys(errorData.data.params).forEach(field => {
+      const errorMessage = errorData.data.params[field];
+      displayFieldError(field, errorMessage);
+    });
+  } else {
+    // Display general error
+    displayError(errorData.message);
+  }
+}
+```
+
+## Order Statuses
+
+After successful checkout, orders are assigned a status based on the payment method:
+
+| Status | Description |
+|--------|-------------|
+| `checkout-draft` | Temporary status during checkout (not a real order yet) |
+| `pending` | Order received, awaiting payment |
+| `processing` | Payment received, order is being prepared |
+| `on-hold` | Awaiting confirmation (e.g., bank transfer) |
+| `completed` | Order fulfilled and complete |
+| `cancelled` | Order cancelled by customer or admin |
+| `refunded` | Order refunded |
+| `failed` | Payment failed or declined |
+
+Most payment gateways set orders to `processing` or `on-hold` after successful checkout.
+
+## Retrieving Order Details
+
+After checkout, customers can retrieve their order using the Order API:
+
+```bash
+GET /wp-json/wc/store/v1/order/:id
+```
+
+This requires the order ID and key for authorization:
+
+```bash
+curl --header "Nonce: 12345" \
+  "https://example-store.com/wp-json/wc/store/v1/order/146?key=wc_order_VPffqyvgWVqWL"
+```
+
+<Note>
+Customers can only access their own orders. The order key provides authorization without requiring authentication.
+</Note>
+
+## Best Practices
+
+### Validate Before Submitting
+
+Use PUT requests during checkout to validate data before final submission:
+
+```javascript
+// Validate address when customer enters it
+async function validateAddress(address) {
+  await fetch('/wp-json/wc/store/v1/checkout', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      'Nonce': nonce
+    },
+    body: JSON.stringify({ billing_address: address })
+  });
+}
+```
+
+### Handle Payment Redirects
+
+Some payment gateways redirect customers to external sites. Always use `payment_result.redirect_url`:
+
+```javascript
+const result = await processCheckout(formData);
+
+if (result.payment_result.payment_status === 'success') {
+  window.location.href = result.payment_result.redirect_url;
+}
+```
+
+### Show Loading States
+
+Checkout can take several seconds. Always show loading indicators:
+
+```javascript
+async function handleCheckout(formData) {
+  setLoading(true);
+  try {
+    const order = await processCheckout(formData);
+    window.location.href = order.payment_result.redirect_url;
+  } catch (error) {
+    displayError(error.message);
+  } finally {
+    setLoading(false);
+  }
+}
+```
+
+### Retry Failed Payments
+
+Allow customers to retry after payment failure:
+
+```javascript
+if (result.payment_result.payment_status === 'failure') {
+  displayError('Payment failed. Please check your payment details and try again.');
+  // Keep checkout form visible for retry
+} else {
+  window.location.href = result.payment_result.redirect_url;
+}
+```
+
+## Security Considerations
+
+<Warning>
+Never store payment card details on your server. Use payment gateway SDKs to tokenize payment information client-side.
+</Warning>
+
+### PCI Compliance
+
+- Use payment gateway JavaScript SDKs to collect card details
+- Never send raw card numbers to your server
+- Use tokens or source IDs in `payment_data`
+
+### Nonce Expiration
+
+Nonces expire after 12-24 hours. If checkout fails with invalid nonce error:
+
+1. Refresh the nonce by making a GET request
+2. Retry the checkout with the new nonce
+
+### HTTPS Required
+
+Always use HTTPS for checkout operations to protect customer data in transit.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Cart API" icon="cart-shopping" href="/api/store-api/cart">
+    Learn about cart management before checkout
+  </Card>
+  
+  <Card title="Store API Overview" icon="store" href="/api/store-api/overview">
+    Back to Store API introduction
+  </Card>
+  
+  <Card title="Payment Gateways" icon="credit-card" href="https://woocommerce.com/product-category/woocommerce-extensions/payment-gateways/">
+    Browse available payment gateway extensions
+  </Card>
+  
+  <Card title="Extending Checkout" icon="code" href="https://github.com/woocommerce/woocommerce-blocks/blob/trunk/docs/third-party-developers/extensibility/checkout-block/">
+    Learn how to extend the checkout experience
+  </Card>
+</CardGroup>

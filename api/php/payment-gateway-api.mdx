@@ -1,0 +1,431 @@
+---
+title: Payment Gateway API
+description: Create custom payment gateways using the WC_Payment_Gateway class
+---
+
+The WooCommerce Payment Gateway API allows you to create custom payment methods by extending the `WC_Payment_Gateway` class. This guide covers the essential methods, properties, and patterns for building payment gateways.
+
+## Gateway Types
+
+Payment gateways in WooCommerce come in several varieties:
+
+- **Form-based**: User is redirected to the payment processor's website (e.g., PayPal Standard)
+- **iFrame-based**: Payment system loads in an iframe on your store
+- **Direct**: Payment fields appear directly on checkout (e.g., credit card forms)
+- **Offline**: No online payment is made (e.g., check, bank transfer)
+
+<Note>
+Direct gateways require SSL certificates and may need PCI compliance. Form and iFrame-based gateways post data offsite, reducing security concerns.
+</Note>
+
+## The WC_Payment_Gateway Class
+
+All payment gateways extend the `WC_Payment_Gateway` class, which provides the foundation for processing payments and managing settings.
+
+### Key Properties
+
+<ParamField path="id" type="string" required>
+  Unique identifier for your gateway (e.g., `'your_gateway'`)
+</ParamField>
+
+<ParamField path="method_title" type="string">
+  Title shown on the admin payment settings page
+</ParamField>
+
+<ParamField path="method_description" type="string">
+  Description shown on the admin payment settings page
+</ParamField>
+
+<ParamField path="title" type="string">
+  Payment method title displayed to customers during checkout
+</ParamField>
+
+<ParamField path="description" type="string">
+  Description displayed to customers during checkout
+</ParamField>
+
+<ParamField path="enabled" type="string">
+  Whether the gateway is enabled (`'yes'` or `'no'`)
+</ParamField>
+
+<ParamField path="has_fields" type="boolean">
+  Set to `true` if the gateway displays payment fields on checkout (for direct integrations)
+</ParamField>
+
+<ParamField path="supports" type="array">
+  Array of features this gateway supports (e.g., `'products'`, `'refunds'`, `'tokenization'`)
+</ParamField>
+
+<ParamField path="icon" type="string">
+  URL to an image displayed next to the gateway name on the frontend
+</ParamField>
+
+## Creating a Basic Payment Gateway
+
+<Steps>
+  <Step title="Create a plugin file">
+    Payment gateways should be created as separate plugins that hook into WooCommerce.
+
+    ```php
+    <?php
+    /**
+     * Plugin Name: My Custom Gateway
+     * Description: A custom payment gateway for WooCommerce
+     * Version: 1.0.0
+     */
+
+    add_action( 'plugins_loaded', 'init_my_custom_gateway' );
+    ```
+  </Step>
+
+  <Step title="Define your gateway class">
+    Create a class that extends `WC_Payment_Gateway` after plugins are loaded.
+
+    ```php
+    function init_my_custom_gateway() {
+        if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
+            return;
+        }
+
+        class WC_Gateway_My_Custom extends WC_Payment_Gateway {
+            public function __construct() {
+                $this->id                 = 'my_custom_gateway';
+                $this->icon               = '';
+                $this->has_fields         = false;
+                $this->method_title       = 'My Custom Gateway';
+                $this->method_description = 'Description of my custom gateway';
+
+                // Load settings
+                $this->init_form_fields();
+                $this->init_settings();
+
+                // Get setting values
+                $this->title       = $this->get_option( 'title' );
+                $this->description = $this->get_option( 'description' );
+
+                // Actions
+                add_action(
+                    'woocommerce_update_options_payment_gateways_' . $this->id,
+                    array( $this, 'process_admin_options' )
+                );
+            }
+
+            // Additional methods here...
+        }
+    }
+    ```
+  </Step>
+
+  <Step title="Register the gateway with WooCommerce">
+    Use the `woocommerce_payment_gateways` filter to add your gateway to the list.
+
+    ```php
+    add_filter( 'woocommerce_payment_gateways', 'add_my_custom_gateway' );
+
+    function add_my_custom_gateway( $methods ) {
+        $methods[] = 'WC_Gateway_My_Custom';
+        return $methods;
+    }
+    ```
+  </Step>
+</Steps>
+
+## Required Methods
+
+### init_form_fields()
+
+Define the settings fields that appear on the gateway's admin settings page.
+
+```php
+public function init_form_fields() {
+    $this->form_fields = array(
+        'enabled' => array(
+            'title'   => __( 'Enable/Disable', 'woocommerce' ),
+            'type'    => 'checkbox',
+            'label'   => __( 'Enable My Custom Gateway', 'woocommerce' ),
+            'default' => 'yes',
+        ),
+        'title' => array(
+            'title'       => __( 'Title', 'woocommerce' ),
+            'type'        => 'text',
+            'description' => __( 'Title displayed to customers during checkout.', 'woocommerce' ),
+            'default'     => __( 'My Payment Method', 'woocommerce' ),
+            'desc_tip'    => true,
+        ),
+        'description' => array(
+            'title'       => __( 'Description', 'woocommerce' ),
+            'type'        => 'textarea',
+            'description' => __( 'Description displayed during checkout.', 'woocommerce' ),
+            'default'     => '',
+            'desc_tip'    => true,
+        ),
+    );
+}
+```
+
+See `/plugins/woocommerce/includes/gateways/cheque/class-wc-gateway-cheque.php:71-102` for a complete example.
+
+### process_payment( $order_id )
+
+Handle payment processing and return the result. This is the core method of any payment gateway.
+
+```php
+public function process_payment( $order_id ) {
+    $order = wc_get_order( $order_id );
+
+    // Mark as on-hold (awaiting payment confirmation)
+    $order->update_status(
+        'on-hold',
+        __( 'Awaiting payment confirmation', 'woocommerce' )
+    );
+
+    // Reduce stock levels
+    wc_reduce_stock_levels( $order_id );
+
+    // Remove cart
+    WC()->cart->empty_cart();
+
+    // Return success and redirect URL
+    return array(
+        'result'   => 'success',
+        'redirect' => $this->get_return_url( $order ),
+    );
+}
+```
+
+<Note>
+Use `$order->payment_complete()` instead of `update_status()` when payment is confirmed. This ensures stock reductions are made and the status changes to the correct value.
+</Note>
+
+See `/plugins/woocommerce/includes/gateways/cheque/class-wc-gateway-cheque.php:144-170` for a real implementation.
+
+## Real-World Example: Cheque Gateway
+
+Here's a simplified version of WooCommerce's built-in cheque gateway:
+
+```php
+class WC_Gateway_Cheque extends WC_Payment_Gateway {
+
+    public function __construct() {
+        $this->id                 = 'cheque';
+        $this->icon               = '';
+        $this->has_fields         = false;
+        $this->method_title       = 'Check Payments';
+        $this->method_description = 'Take payments via checks.';
+
+        // Load settings
+        $this->init_form_fields();
+        $this->init_settings();
+
+        // Get setting values
+        $this->title        = $this->get_option( 'title' );
+        $this->description  = $this->get_option( 'description' );
+        $this->instructions = $this->get_option( 'instructions' );
+
+        // Actions
+        add_action(
+            'woocommerce_update_options_payment_gateways_' . $this->id,
+            array( $this, 'process_admin_options' )
+        );
+        add_action(
+            'woocommerce_thankyou_cheque',
+            array( $this, 'thankyou_page' )
+        );
+    }
+
+    public function process_payment( $order_id ) {
+        $order = wc_get_order( $order_id );
+
+        if ( $order->get_total() > 0 ) {
+            $order->update_status(
+                'on-hold',
+                __( 'Awaiting check payment', 'woocommerce' )
+            );
+        } else {
+            $order->payment_complete();
+        }
+
+        // Reduce stock levels
+        wc_reduce_stock_levels( $order_id );
+
+        // Remove cart
+        WC()->cart->empty_cart();
+
+        return array(
+            'result'   => 'success',
+            'redirect' => $this->get_return_url( $order ),
+        );
+    }
+}
+```
+
+## Direct Payment Gateways
+
+For gateways that collect payment information directly on checkout:
+
+<Steps>
+  <Step title="Enable payment fields">
+    ```php
+    $this->has_fields = true;
+    ```
+  </Step>
+
+  <Step title="Implement payment_fields()">
+    Display your custom payment form.
+
+    ```php
+    public function payment_fields() {
+        if ( $this->description ) {
+            echo wpautop( wptexturize( $this->description ) );
+        }
+        // Output your payment form fields here
+    }
+    ```
+  </Step>
+
+  <Step title="Implement validate_fields()">
+    Validate the submitted payment data.
+
+    ```php
+    public function validate_fields() {
+        if ( empty( $_POST['my_gateway_field'] ) ) {
+            wc_add_notice(
+                __( 'Payment field is required.', 'woocommerce' ),
+                'error'
+            );
+            return false;
+        }
+        return true;
+    }
+    ```
+  </Step>
+
+  <Step title="Process payment in process_payment()">
+    ```php
+    public function process_payment( $order_id ) {
+        $order = wc_get_order( $order_id );
+
+        // Attempt payment with payment provider
+        $result = $this->process_payment_with_provider( $order );
+
+        if ( $result['success'] ) {
+            $order->payment_complete( $result['transaction_id'] );
+            WC()->cart->empty_cart();
+
+            return array(
+                'result'   => 'success',
+                'redirect' => $this->get_return_url( $order ),
+            );
+        } else {
+            wc_add_notice(
+                __( 'Payment error: ', 'woocommerce' ) . $result['error'],
+                'error'
+            );
+            return array(
+                'result' => 'failure',
+            );
+        }
+    }
+    ```
+  </Step>
+</Steps>
+
+## Supporting Refunds
+
+To support refunds, declare support and implement the refund method:
+
+```php
+public function __construct() {
+    // ... other constructor code ...
+    $this->supports = array(
+        'products',
+        'refunds',
+    );
+}
+
+public function process_refund( $order_id, $amount = null, $reason = '' ) {
+    $order = wc_get_order( $order_id );
+
+    // Process refund with payment provider
+    $result = $this->refund_with_provider( $order, $amount, $reason );
+
+    if ( $result['success'] ) {
+        $order->add_order_note(
+            sprintf(
+                __( 'Refunded %s - Reason: %s', 'woocommerce' ),
+                wc_price( $amount ),
+                $reason
+            )
+        );
+        return true;
+    } else {
+        return new WP_Error( 'error', $result['error_message'] );
+    }
+}
+```
+
+## Payment Gateway Callbacks
+
+For gateways that use callbacks (like PayPal IPN), use the WC-API hook:
+
+```php
+public function __construct() {
+    // ... other constructor code ...
+
+    add_action(
+        'woocommerce_api_wc_gateway_my_custom',
+        array( $this, 'handle_callback' )
+    );
+}
+
+public function get_callback_url() {
+    return add_query_arg(
+        'wc-api',
+        'WC_Gateway_My_Custom',
+        home_url( '/' )
+    );
+}
+
+public function handle_callback() {
+    // Process the callback from payment provider
+    // Validate the request, update order status, etc.
+}
+```
+
+<Warning>
+Always validate callback requests to ensure they're coming from your payment provider. Use signatures, tokens, or IP address validation.
+</Warning>
+
+## Order Status Best Practices
+
+- **On-Hold**: Order completed but requires manual verification
+- **Failed**: Payment attempt failed
+- **Processing/Completed**: Use `$order->payment_complete()` to let WooCommerce handle the status
+
+## Available Methods
+
+The `WC_Payment_Gateway` class provides these useful methods:
+
+| Method | Description |
+|--------|-------------|
+| `get_return_url( $order )` | Get the thank you page URL |
+| `get_transaction_url( $order )` | Get link to view transaction on payment processor |
+| `is_available()` | Check if gateway is available for use |
+| `get_title()` | Get gateway title for frontend display |
+| `get_description()` | Get gateway description for frontend display |
+| `get_icon()` | Get gateway icon HTML |
+| `supports( $feature )` | Check if gateway supports a feature |
+| `can_refund_order( $order )` | Check if order can be refunded |
+
+See `/plugins/woocommerce/includes/abstracts/abstract-wc-payment-gateway.php` for the complete implementation.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Payment Token API" icon="credit-card" href="/api/php/payment-token-api">
+    Add tokenization support to store payment methods
+  </Card>
+  <Card title="Settings API" icon="gear" href="https://developer.woocommerce.com/docs/settings-api/">
+    Learn more about the WooCommerce Settings API
+  </Card>
+</CardGroup>

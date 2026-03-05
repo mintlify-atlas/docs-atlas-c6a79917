@@ -1,0 +1,661 @@
+---
+title: Git Workflow
+description: Git workflow for WooCommerce development including branching, commits, pull requests, and changelog requirements
+---
+
+WooCommerce follows a structured Git workflow to maintain code quality and enable efficient collaboration. This guide covers branching strategies, commit conventions, pull request requirements, and changelog management.
+
+## Repository Structure
+
+WooCommerce is organized as a **monorepo** containing multiple packages and plugins:
+
+```text
+woocommerce/
+├── plugins/
+│   ├── woocommerce/              # Core plugin
+│   └── woocommerce-beta-tester/  # Beta tester plugin
+├── packages/
+│   ├── js/                        # JavaScript packages
+│   └── php/                       # PHP packages
+└── tools/                         # Development tools
+```
+
+<Info>
+  Changes to any package require a changelog entry for that specific package before creating a PR.
+</Info>
+
+## Branching Strategy
+
+WooCommerce uses a trunk-based development workflow:
+
+### Branch Types
+
+<Tabs>
+  <Tab title="trunk">
+    - Main development branch
+    - All PRs target `trunk` by default
+    - Always in a releasable state
+    - Automatically deployed to staging
+  </Tab>
+  
+  <Tab title="Feature Branches">
+    - Created from `trunk`
+    - Named descriptively: `add/order-filtering`
+    - Merged back to `trunk` via PR
+    - Deleted after merge
+  </Tab>
+  
+  <Tab title="Release Branches">
+    - Created from `trunk` for releases
+    - Named `release/X.Y`
+    - Receive only critical fixes
+    - Managed by core team
+  </Tab>
+  
+  <Tab title="Hotfix Branches">
+    - Created from release branch
+    - Named `fix/critical-bug`
+    - Merged to release and `trunk`
+    - For critical production issues only
+  </Tab>
+</Tabs>
+
+### Creating a Feature Branch
+
+<Steps>
+  <Step title="Fork the Repository">
+    Fork WooCommerce to your GitHub account via the [repository page](https://github.com/woocommerce/woocommerce).
+  </Step>
+  
+  <Step title="Clone Your Fork">
+    ```bash
+    git clone https://github.com/YOUR-USERNAME/woocommerce.git
+    cd woocommerce
+    ```
+  </Step>
+  
+  <Step title="Add Upstream Remote">
+    ```bash
+    git remote add upstream https://github.com/woocommerce/woocommerce.git
+    git fetch upstream
+    ```
+  </Step>
+  
+  <Step title="Create Feature Branch">
+    ```bash
+    # Update your local trunk
+    git checkout trunk
+    git pull upstream trunk
+    
+    # Create feature branch
+    git checkout -b add/order-export-feature
+    ```
+  </Step>
+</Steps>
+
+### Branch Naming Conventions
+
+Use descriptive prefixes for branch names:
+
+- `add/` - New features
+- `update/` - Enhancements to existing features  
+- `fix/` - Bug fixes
+- `dev/` - Development/infrastructure changes
+- `tweak/` - Minor adjustments
+
+```bash
+# ✅ Good branch names
+add/order-export-csv
+fix/checkout-validation-error
+update/product-search-performance
+dev/upgrade-phpunit-version
+
+# ❌ Bad branch names
+my-changes
+test
+fix-bug
+```
+
+## Commit Guidelines
+
+Write clear, meaningful commit messages that explain **why** changes were made, not just **what** changed.
+
+### Commit Message Format
+
+```text
+Short summary (50 chars or less)
+
+More detailed explanation if necessary. Wrap at 72 characters.
+Explain the problem this commit solves and why this approach
+was chosen over alternatives.
+
+Closes #123
+```
+
+### Writing Good Commit Messages
+
+<Tabs>
+  <Tab title="Do">
+    ```bash
+    # ✅ Good commits
+    git commit -m "Add CSV export for orders
+    
+    Implements CSV export functionality requested in #456.
+    Uses league/csv for proper encoding and performance.
+    
+    Closes #456"
+    
+    git commit -m "Fix checkout validation for empty fields
+    
+    Validates all required fields before form submission
+    to prevent incomplete orders. Adds client-side validation
+    for better UX.
+    
+    Fixes #789"
+    ```
+  </Tab>
+  
+  <Tab title="Don't">
+    ```bash
+    # ❌ Bad commits
+    git commit -m "fix bug"
+    git commit -m "updates"
+    git commit -m "WIP"
+    git commit -m "changes"
+    ```
+  </Tab>
+</Tabs>
+
+### Commit Message Best Practices
+
+<Note>
+  - Use present tense ("Add feature" not "Added feature")
+  - Capitalize first letter of summary
+  - No period at end of summary line
+  - Reference issue numbers with `Closes #123` or `Fixes #456`
+  - Keep summary under 50 characters
+  - Wrap body at 72 characters
+  - Explain **why**, not just **what**
+</Note>
+
+### Linking to Issues
+
+Reference issues and PRs in commit messages:
+
+```bash
+# Close an issue
+git commit -m "Fix order total calculation
+
+Closes #1234"
+
+# Reference without closing
+git commit -m "Improve order query performance
+
+Related to #2345"
+
+# Reference bug-introducing PR
+git commit -m "Fix regression in checkout flow
+
+Bug introduced in PR #3456"
+```
+
+## Changelog Management
+
+<Warning>
+  **NEVER create a PR without changelog entries.** Each affected package requires its own changelog entry.
+</Warning>
+
+### Creating Changelog Entries
+
+Before creating a PR, add changelog entries for each modified package:
+
+```bash
+# For WooCommerce Core
+pnpm --filter=@woocommerce/plugin-woocommerce changelog add
+
+# For other packages
+pnpm --filter=@woocommerce/components changelog add
+pnpm --filter=@woocommerce/data changelog add
+```
+
+<Steps>
+  <Step title="Run Changelog Command">
+    ```bash
+    cd plugins/woocommerce
+    pnpm changelog add
+    ```
+  </Step>
+  
+  <Step title="Select Change Significance">
+    ```text
+    ? Select the significance of this change:
+      patch   - Bug fixes, minor changes
+      minor   - New features, non-breaking changes
+      major   - Breaking changes
+    ```
+  </Step>
+  
+  <Step title="Select Change Type">
+    ```text
+    ? Select the type of change:
+      Fix           - Fixes an existing bug
+      Add           - Adds new functionality  
+      Update        - Updates existing functionality
+      Dev           - Development related task
+      Tweak         - Minor adjustment to codebase
+      Performance   - Performance improvements
+      Enhancement   - Improvement to existing functionality
+    ```
+  </Step>
+  
+  <Step title="Write Changelog Message">
+    ```text
+    ? Enter a short description of the change:
+    Add CSV export functionality for orders
+    ```
+  </Step>
+  
+  <Step title="Commit Changelog File">
+    ```bash
+    git add changelog/
+    git commit -m "Add changelog entry"
+    ```
+  </Step>
+</Steps>
+
+### Changelog File Format
+
+Changelog entries are created as YAML files:
+
+```yaml changelog/fix-checkout-validation
+significance: patch
+type: fix
+message: Fix checkout validation for required fields
+```
+
+## Pull Request Workflow
+
+### Before Creating a PR
+
+<Steps>
+  <Step title="Ensure Tests Pass">
+    ```bash
+    # Run relevant tests
+    pnpm test:php:env
+    pnpm test:e2e
+    ```
+  </Step>
+  
+  <Step title="Run Linting">
+    ```bash
+    # Lint changed files
+    pnpm --filter=@woocommerce/plugin-woocommerce lint:php:changes
+    pnpm --filter=@woocommerce/plugin-woocommerce lint:lang:js
+    ```
+  </Step>
+  
+  <Step title="Run PHPStan">
+    ```bash
+    # Analyze modified PHP files
+    cd plugins/woocommerce
+    composer exec -- phpstan analyse src/path/to/File.php --memory-limit=2G
+    ```
+  </Step>
+  
+  <Step title="Create Changelog Entries">
+    ```bash
+    # Add changelog for each affected package
+    pnpm --filter=@woocommerce/plugin-woocommerce changelog add
+    ```
+  </Step>
+  
+  <Step title="Push Changes">
+    ```bash
+    git push origin add/your-feature-branch
+    ```
+  </Step>
+</Steps>
+
+### Creating the Pull Request
+
+<Steps>
+  <Step title="Open GitHub PR">
+    Navigate to your fork on GitHub and click "Compare & pull request"
+  </Step>
+  
+  <Step title="Fill PR Template">
+    Use the provided template from `.github/PULL_REQUEST_TEMPLATE.md`:
+    
+    ```markdown
+    ### Changes proposed in this Pull Request:
+    
+    This PR adds CSV export functionality for orders, allowing
+    merchants to export order data for external processing.
+    
+    Closes #456
+    
+    ### How to test the changes in this Pull Request:
+    
+    1. Navigate to WooCommerce > Orders
+    2. Select multiple orders using checkboxes
+    3. Choose "Export to CSV" from bulk actions
+    4. Click "Apply"
+    5. Verify CSV downloads with correct data
+    
+    ### Screenshots or screen recordings:
+    
+    [Include screenshots if UI changed]
+    ```
+  </Step>
+  
+  <Step title="Set Milestone">
+    Check the box to auto-assign milestone:
+    ```markdown
+    - [x] Automatically assign milestone for next WooCommerce version
+    ```
+  </Step>
+  
+  <Step title="Add Labels">
+    Add appropriate labels:
+    - `type: enhancement`, `type: fix`, etc.
+    - `focus: area-name` for specific features
+  </Step>
+</Steps>
+
+### Pull Request Template Sections
+
+<Tabs>
+  <Tab title="Submission Review">
+    ```markdown
+    ### Submission Review Guidelines:
+    
+    - [x] I have followed the WooCommerce Contributing Guidelines
+    - [x] I have followed WordPress Coding Standards  
+    - [x] I have checked for other open PRs for same change
+    - [x] I have reviewed my code for security best practices
+    ```
+  </Tab>
+  
+  <Tab title="Changes Description">
+    ```markdown
+    ### Changes proposed in this Pull Request:
+    
+    <!-- Describe what changed and why -->
+    
+    Closes #123
+    
+    <!-- For bug fixes -->
+    Bug introduced in PR #456
+    ```
+  </Tab>
+  
+  <Tab title="Testing Instructions">
+    ```markdown
+    ### How to test the changes in this Pull Request:
+    
+    Using the WooCommerce Testing Instructions Guide:
+    
+    1. Step one with specific details
+    2. Step two with expected outcome
+    3. Step three with verification steps
+    ```
+  </Tab>
+  
+  <Tab title="Changelog Entry">
+    ```markdown
+    ### Changelog entry
+    
+    - [x] Automatically create changelog from details below
+    
+    #### Significance
+    - [x] Patch
+    
+    #### Type  
+    - [x] Add - Adds functionality
+    
+    #### Message
+    Add CSV export functionality for orders
+    ```
+  </Tab>
+</Tabs>
+
+### PR Review Process
+
+<Steps>
+  <Step title="Automated Checks">
+    - Linting (PHP, JavaScript)
+    - PHPUnit tests
+    - E2E tests
+    - API tests
+    - PHPStan analysis
+  </Step>
+  
+  <Step title="Code Review">
+    - Core team reviews code
+    - Requests changes if needed
+    - Approves when ready
+  </Step>
+  
+  <Step title="Address Feedback">
+    ```bash
+    # Make requested changes
+    git add .
+    git commit -m "Address review feedback"
+    git push origin add/your-feature-branch
+    ```
+  </Step>
+  
+  <Step title="Merge">
+    - PR is merged to trunk by maintainer
+    - Branch is automatically deleted
+  </Step>
+</Steps>
+
+## Advanced Git Workflows
+
+### Keeping Your Branch Updated
+
+```bash
+# Fetch latest changes from upstream
+git fetch upstream
+
+# Rebase your branch on latest trunk
+git checkout add/your-feature
+git rebase upstream/trunk
+
+# Force push if already pushed (use with caution)
+git push origin add/your-feature --force-with-lease
+```
+
+<Warning>
+  Only use `--force-with-lease` on your own feature branches, never on shared branches or trunk.
+</Warning>
+
+### Squashing Commits
+
+Squash multiple commits before merging:
+
+```bash
+# Interactive rebase for last 3 commits
+git rebase -i HEAD~3
+
+# In the editor, change 'pick' to 'squash' for commits to combine
+pick abc123 First commit
+squash def456 Second commit  
+squash ghi789 Third commit
+
+# Edit combined commit message
+# Force push to update PR
+git push origin add/your-feature --force-with-lease
+```
+
+### Cherry-Picking Changes
+
+Apply specific commits to another branch:
+
+```bash
+# Using the monorepo cherry-pick tool
+pnpm cherry-pick <commit-hash> <target-branch>
+
+# Manual cherry-pick
+git checkout release/9.0
+git cherry-pick abc123
+git push upstream release/9.0
+```
+
+## Common Git Issues
+
+<AccordionGroup>
+  <Accordion title="Merge conflicts">
+    ```bash
+    # Update trunk
+    git fetch upstream
+    git checkout trunk
+    git merge upstream/trunk
+    
+    # Rebase feature branch
+    git checkout add/your-feature
+    git rebase trunk
+    
+    # Resolve conflicts in your editor
+    # After resolving:
+    git add .
+    git rebase --continue
+    ```
+  </Accordion>
+  
+  <Accordion title="Wrong branch committed to">
+    ```bash
+    # If committed to trunk instead of feature branch
+    git checkout trunk
+    git reset --soft HEAD~1  # Undo commit, keep changes
+    git stash                # Stash changes
+    git checkout -b add/new-feature  # Create feature branch
+    git stash pop           # Apply changes
+    git commit              # Commit to feature branch
+    ```
+  </Accordion>
+  
+  <Accordion title="Forgot to create changelog">
+    ```bash
+    # Create changelog entry
+    pnpm --filter=@woocommerce/plugin-woocommerce changelog add
+    
+    # Amend last commit to include changelog
+    git add changelog/
+    git commit --amend --no-edit
+    
+    # Force push to update PR
+    git push origin add/your-feature --force-with-lease
+    ```
+  </Accordion>
+  
+  <Accordion title="Need to update PR after push">
+    ```bash
+    # Make additional changes
+    git add .
+    git commit -m "Address review feedback"
+    git push origin add/your-feature
+    
+    # PR will automatically update
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Git Best Practices
+
+### Do's
+
+- ✅ Keep commits focused and atomic
+- ✅ Write descriptive commit messages
+- ✅ Reference issues in commits and PRs
+- ✅ Create changelog entries before PRs
+- ✅ Rebase on trunk regularly
+- ✅ Test before pushing
+- ✅ Use meaningful branch names
+
+### Don'ts  
+
+- ❌ Commit directly to trunk
+- ❌ Force push to shared branches
+- ❌ Create PRs without changelog entries
+- ❌ Commit without testing
+- ❌ Use vague commit messages
+- ❌ Include unrelated changes in commits
+- ❌ Commit sensitive data or credentials
+
+## GitHub CLI (gh)
+
+Use GitHub CLI for efficient PR management:
+
+```bash
+# Install gh
+brew install gh  # macOS
+
+# Authenticate
+gh auth login
+
+# Create PR from command line
+gh pr create --title "Add order export feature" \
+  --body "Implements CSV export for orders. Closes #456"
+
+# Check PR status
+gh pr status
+
+# View PR checks
+gh pr checks
+
+# Checkout PR locally
+gh pr checkout 123
+
+# View PR diff
+gh pr diff 123
+```
+
+## Pre-commit Hooks
+
+WooCommerce uses Husky for pre-commit hooks that automatically:
+
+- Run PHP syntax check (`php -l`)
+- Run PHP_CodeSniffer on staged files
+- Run ESLint on staged JavaScript files
+- Fix auto-fixable issues
+
+```json .husky/pre-commit
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+pnpm exec lint-staged
+```
+
+<Info>
+  Pre-commit hooks help catch issues before they reach CI, saving time and ensuring code quality.
+</Info>
+
+## Summary Checklist
+
+Before creating a PR, ensure:
+
+- [ ] Created feature branch from latest `trunk`
+- [ ] Made focused, atomic commits with good messages
+- [ ] Added changelog entries for all affected packages
+- [ ] All tests pass locally
+- [ ] Linting passes (PHP and JavaScript)
+- [ ] PHPStan analysis passes
+- [ ] PR description follows template
+- [ ] Testing instructions are clear
+- [ ] Referenced related issues
+- [ ] Added screenshots for UI changes
+- [ ] Set appropriate milestone
+- [ ] Added relevant labels
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Coding Standards" icon="code" href="/contributing/coding-standards">
+    Review coding standards and linting requirements
+  </Card>
+  <Card title="Testing" icon="vial" href="/contributing/testing">
+    Learn about testing requirements and commands
+  </Card>
+</CardGroup>

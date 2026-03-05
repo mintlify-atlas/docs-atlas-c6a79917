@@ -1,0 +1,158 @@
+---
+title: Contributing to WooCommerce
+description: Learn how to contribute to WooCommerce development through code, testing, documentation, and community support
+---
+
+WooCommerce powers millions of online stores across the internet, and your help making it even more awesome will be greatly appreciated. There are many ways to contribute to the project, from code contributions to testing and community support.
+
+## Ways to Contribute
+
+You can contribute to WooCommerce in several meaningful ways:
+
+<CardGroup cols={2}>
+  <Card title="Code Contributions" icon="code">
+    Submit fixes, improvements, and enhancements to the core plugin
+  </Card>
+  <Card title="Testing" icon="vial">
+    Test open issues, pull requests, and beta releases
+  </Card>
+  <Card title="Translation" icon="language">
+    Help translate WooCommerce into your language
+  </Card>
+  <Card title="Community Support" icon="users">
+    Answer questions on support forums and help other users
+  </Card>
+</CardGroup>
+
+## Getting Started with Code Contributions
+
+If you wish to contribute code, please follow these steps:
+
+<Steps>
+  <Step title="Read the Documentation">
+    Familiarize yourself with the project [README](https://github.com/woocommerce/woocommerce/blob/trunk/README.md) and [DEVELOPMENT.md](https://github.com/woocommerce/woocommerce/blob/trunk/DEVELOPMENT.md)
+  </Step>
+  
+  <Step title="Set Up Your Environment">
+    Install the required prerequisites:
+    - [NVM](https://github.com/nvm-sh/nvm) for Node.js version management
+    - [PNPM](https://pnpm.io/installation) for package management
+    - [PHP 7.4+](https://www.php.net/manual/en/install.php)
+    - [Composer](https://getcomposer.org/doc/00-intro.md) for PHP dependencies
+  </Step>
+  
+  <Step title="Fork and Clone">
+    [Fork](https://docs.github.com/en/get-started/quickstart/fork-a-repo) the WooCommerce repository and clone it locally
+  </Step>
+  
+  <Step title="Install Dependencies">
+    Run the installation commands:
+    ```bash
+    nvm install
+    pnpm install
+    pnpm build
+    ```
+  </Step>
+  
+  <Step title="Make Your Changes">
+    Create a branch, make your changes, and ensure they follow our coding standards
+  </Step>
+  
+  <Step title="Submit a Pull Request">
+    Push your changes and [submit a pull request](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests)
+  </Step>
+</Steps>
+
+## Finding Issues to Work On
+
+We use the `good first issue` label to mark issues that are suitable for new contributors. You can find all issues with this label [here](https://github.com/woocommerce/woocommerce/issues?q=is%3Aopen+is%3Aissue+label%3A%22type%3A+good+first+issue%22).
+
+<Info>
+  Before starting work on an issue, check the comments to see if someone else is already working on it. Consider leaving a comment to let others know you're taking it on.
+</Info>
+
+## License and Copyright
+
+WooCommerce is licensed under **GPLv3+**, and all contributions to the project will be released under the same license.
+
+- You maintain **copyright** over any contribution you make
+- By submitting a pull request, you agree to release that contribution under the GPLv3+ license
+- Your code must support the minimum supported versions of PHP and WordPress shown in `readme.txt`
+
+## Community and Support
+
+### Where to Get Help
+
+If you have questions about contributing or want to discuss your contribution:
+
+- **Slack**: Join the #core channel in the [WooCommerce community Slack](https://woocommerce.com/community-slack/)
+- **GitHub Discussions**: For broader discussions, use [GitHub Discussions](https://github.com/woocommerce/woocommerce/discussions)
+- **Office Hours**: Sync with the team during scheduled office hours
+
+### Testing and Feedback
+
+You can help by:
+
+- Testing open [issues](https://github.com/woocommerce/woocommerce/issues) or [pull requests](https://github.com/woocommerce/woocommerce/pulls)
+- Testing WooCommerce beta versions and release candidates (announced on the [WooCommerce development blog](https://developer.woocommerce.com/blog/))
+- Answering questions on the [WP.org support forums](https://wordpress.org/support/plugin/woocommerce/)
+
+### Translation
+
+Help make WooCommerce available in your language by [translating strings](https://developer.woocommerce.com/docs/best-practices/localization-translation/translating-woocommerce/).
+
+## Security Disclosures
+
+<Warning>
+  To disclose a security issue to our team, [please submit a report via HackerOne](https://hackerone.com/automattic/). Do not open public GitHub issues for security vulnerabilities.
+</Warning>
+
+## Feature Requests
+
+The best place to submit feature requests is on our [dedicated feature request page](https://woocommerce.com/feature-requests/woocommerce/), where you can:
+
+- Search for existing requests
+- Vote for features you'd like to see
+- Create new requests
+
+For straightforward technical enhancements, you can also [open a new issue](https://github.com/woocommerce/woocommerce/issues/new?assignees=&labels=type%3A+enhancement%2Cstatus%3A+awaiting+triage&template=2-enhancement.yml&title=%5BEnhancement%5D%3A+) on GitHub.
+
+## Code of Conduct
+
+We are committed to fostering an open and welcoming environment. All contributors are expected to:
+
+- Use welcoming and inclusive language
+- Be respectful of differing viewpoints and experiences
+- Gracefully accept constructive criticism
+- Focus on what is best for the community
+- Show empathy towards other community members
+
+### Unacceptable Behavior
+
+Examples of unacceptable behavior include:
+
+- The use of sexualized language or imagery and unwelcome sexual attention
+- Trolling, insulting/derogatory comments, and personal or political attacks
+- Public or private harassment
+- Publishing others' private information without explicit permission
+- Other conduct which could reasonably be considered inappropriate in a professional setting
+
+### Enforcement
+
+Instances of abusive, harassing, or otherwise unacceptable behavior may be reported by contacting the project team at [support@woocommerce.com](mailto:support@woocommerce.com). All complaints will be reviewed and investigated promptly and fairly.
+
+## Next Steps
+
+Ready to contribute? Check out these guides:
+
+<CardGroup cols={2}>
+  <Card title="Coding Standards" icon="code" href="/contributing/coding-standards">
+    Learn about PHP and JavaScript coding standards
+  </Card>
+  <Card title="Testing" icon="vial" href="/contributing/testing">
+    Understand testing requirements and how to run tests
+  </Card>
+  <Card title="Git Workflow" icon="code-branch" href="/contributing/git-workflow">
+    Follow our Git workflow for branches, commits, and PRs
+  </Card>
+</CardGroup>

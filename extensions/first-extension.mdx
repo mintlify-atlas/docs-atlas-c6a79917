@@ -1,0 +1,526 @@
+---
+title: Building your first WooCommerce extension
+description: Step-by-step tutorial to create a basic WooCommerce extension with proper structure, activation hooks, and best practices
+---
+
+# Building your first WooCommerce extension
+
+This tutorial will guide you through creating a simple WooCommerce extension from scratch. You'll learn the essential structure, plugin headers, and activation/deactivation hooks needed for any WooCommerce extension.
+
+## What we'll build
+
+We'll create a simple extension called "WooCommerce Product Badge" that adds a custom badge to products on sale. This extension will demonstrate:
+
+- Proper plugin structure and file organization
+- WordPress plugin headers
+- WooCommerce dependency checking
+- Activation and deactivation hooks
+- Using WooCommerce template hooks
+
+## Plugin structure
+
+First, let's create the basic file structure for our extension.
+
+<Steps>
+
+<Step title="Create the plugin directory">
+
+Create a new directory in `wp-content/plugins/` called `woocommerce-product-badge`:
+
+```bash
+mkdir wp-content/plugins/woocommerce-product-badge
+cd wp-content/plugins/woocommerce-product-badge
+```
+
+</Step>
+
+<Step title="Create the main plugin file">
+
+Create a file named `woocommerce-product-badge.php`. The main plugin file should match the directory name.
+
+<Note>
+The text domain should match your plugin directory name. For example, a plugin with directory name `woocommerce-product-badge` should have text domain `woocommerce-product-badge`. Do not use underscores.
+</Note>
+
+</Step>
+
+<Step title="Create additional files">
+
+Create a basic file structure:
+
+```
+woocommerce-product-badge/
+├── woocommerce-product-badge.php  (Main plugin file)
+├── readme.txt                     (WordPress readme)
+├── changelog.txt                  (Changelog file)
+├── includes/                      (PHP classes and functions)
+├── assets/                        (CSS, JavaScript, images)
+│   ├── css/
+│   └── js/
+└── languages/                     (Translation files)
+```
+
+</Step>
+
+</Steps>
+
+## Plugin header comment
+
+Every WordPress plugin needs a header comment in the main file. This provides WordPress with metadata about your plugin.
+
+Add this to the top of `woocommerce-product-badge.php`:
+
+```php woocommerce-product-badge.php
+<?php
+/**
+ * Plugin Name: WooCommerce Product Badge
+ * Plugin URI: https://example.com/woocommerce-product-badge/
+ * Description: Adds custom badges to products on sale in your WooCommerce store.
+ * Version: 1.0.0
+ * Author: Your Name
+ * Author URI: https://example.com/
+ * Developer: Your Name
+ * Developer URI: https://example.com/
+ * Text Domain: woocommerce-product-badge
+ * Domain Path: /languages
+ *
+ * WC requires at least: 8.0
+ * WC tested up to: 8.9
+ *
+ * License: GNU General Public License v3.0
+ * License URI: http://www.gnu.org/licenses/gpl-3.0.html
+ */
+
+defined( 'ABSPATH' ) || exit;
+```
+
+### Header field explanations
+
+- **Plugin Name**: The name displayed in the WordPress admin
+- **Plugin URI**: The plugin's homepage or product page
+- **Description**: A short description of what the plugin does
+- **Version**: Current version number (use [semantic versioning](https://semver.org/))
+- **Author**: The plugin author's name
+- **Author URI**: The author's website
+- **Developer**: Developer name if different from author
+- **Developer URI**: Developer's website
+- **Text Domain**: Used for internationalization (must match directory name)
+- **Domain Path**: Location of translation files
+- **WC requires at least**: Minimum WooCommerce version required
+- **WC tested up to**: Latest WooCommerce version tested with
+- **License**: Plugin license
+- **License URI**: Full license text URL
+
+<Warning>
+The `defined( 'ABSPATH' ) || exit;` line prevents direct access to your PHP files, which is crucial for security. Include this in all your PHP files.
+</Warning>
+
+## Check if WooCommerce is active
+
+Your extension should only initialize if WooCommerce is active. Add this check after the header:
+
+```php woocommerce-product-badge.php
+/**
+ * Check if WooCommerce is active
+ */
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
+    return;
+}
+```
+
+For multisite installations, you may need additional checks. See [Check if WooCommerce is active](/docs/extensions/core-concepts/check-if-woo-is-active) for more details.
+
+## Define constants
+
+Define useful constants for your plugin:
+
+```php woocommerce-product-badge.php
+// Define plugin constants
+define( 'WC_PRODUCT_BADGE_VERSION', '1.0.0' );
+define( 'WC_PRODUCT_BADGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'WC_PRODUCT_BADGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'WC_PRODUCT_BADGE_PLUGIN_FILE', __FILE__ );
+```
+
+These constants make it easy to reference your plugin's directory, URL, and version throughout your code.
+
+## Create the main plugin class
+
+Organize your code in a class for better structure and maintainability:
+
+```php woocommerce-product-badge.php
+/**
+ * Main plugin class
+ */
+class WC_Product_Badge {
+    
+    /**
+     * Plugin instance
+     *
+     * @var WC_Product_Badge
+     */
+    private static $instance = null;
+    
+    /**
+     * Get plugin instance
+     *
+     * @return WC_Product_Badge
+     */
+    public static function get_instance() {
+        if ( null === self::$instance ) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+    
+    /**
+     * Constructor
+     */
+    private function __construct() {
+        $this->init_hooks();
+    }
+    
+    /**
+     * Initialize hooks
+     */
+    private function init_hooks() {
+        // Load plugin text domain for translations
+        add_action( 'init', array( $this, 'load_textdomain' ) );
+        
+        // Add custom badge to product
+        add_action( 'woocommerce_before_shop_loop_item_title', array( $this, 'add_sale_badge' ), 10 );
+        
+        // Enqueue styles
+        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_styles' ) );
+    }
+    
+    /**
+     * Load plugin text domain
+     */
+    public function load_textdomain() {
+        load_plugin_textdomain(
+            'woocommerce-product-badge',
+            false,
+            dirname( plugin_basename( WC_PRODUCT_BADGE_PLUGIN_FILE ) ) . '/languages'
+        );
+    }
+    
+    /**
+     * Add custom sale badge
+     */
+    public function add_sale_badge() {
+        global $product;
+        
+        if ( $product && $product->is_on_sale() ) {
+            echo '<span class="wc-product-badge">' . esc_html__( 'On Sale!', 'woocommerce-product-badge' ) . '</span>';
+        }
+    }
+    
+    /**
+     * Enqueue frontend styles
+     */
+    public function enqueue_styles() {
+        wp_enqueue_style(
+            'wc-product-badge',
+            WC_PRODUCT_BADGE_PLUGIN_URL . 'assets/css/product-badge.css',
+            array(),
+            WC_PRODUCT_BADGE_VERSION
+        );
+    }
+}
+
+// Initialize the plugin
+WC_Product_Badge::get_instance();
+```
+
+## Activation and deactivation hooks
+
+Plugins can perform actions when activated or deactivated. Add these hooks at the end of your main plugin file:
+
+```php woocommerce-product-badge.php
+/**
+ * Plugin activation hook
+ */
+function wc_product_badge_activate() {
+    // Check if WooCommerce is active
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        deactivate_plugins( plugin_basename( WC_PRODUCT_BADGE_PLUGIN_FILE ) );
+        wp_die(
+            esc_html__( 'WooCommerce Product Badge requires WooCommerce to be installed and active.', 'woocommerce-product-badge' ),
+            'Plugin dependency check',
+            array( 'back_link' => true )
+        );
+    }
+    
+    // Set default options
+    add_option( 'wc_product_badge_version', WC_PRODUCT_BADGE_VERSION );
+    add_option( 'wc_product_badge_activated', time() );
+    
+    // Flush rewrite rules
+    flush_rewrite_rules();
+}
+register_activation_hook( WC_PRODUCT_BADGE_PLUGIN_FILE, 'wc_product_badge_activate' );
+
+/**
+ * Plugin deactivation hook
+ */
+function wc_product_badge_deactivate() {
+    // Clean up scheduled tasks
+    // Note: Don't delete options on deactivation, only on uninstall
+    
+    // Flush rewrite rules
+    flush_rewrite_rules();
+}
+register_deactivation_hook( WC_PRODUCT_BADGE_PLUGIN_FILE, 'wc_product_badge_deactivate' );
+```
+
+<Info>
+Use the activation hook to set up initial options, create custom database tables, or check dependencies. Use the deactivation hook to clean up temporary data, but don't delete user options—save that for the uninstall hook.
+</Info>
+
+## Uninstallation
+
+For proper cleanup when a user uninstalls your plugin, create a separate `uninstall.php` file:
+
+```php uninstall.php
+<?php
+/**
+ * Uninstall script
+ *
+ * Runs when the plugin is uninstalled via the WordPress admin.
+ */
+
+defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
+
+// Delete plugin options
+delete_option( 'wc_product_badge_version' );
+delete_option( 'wc_product_badge_activated' );
+
+// Delete user meta
+delete_metadata( 'user', 0, 'wc_product_badge_preference', '', true );
+
+// Clear any cached data
+wp_cache_flush();
+```
+
+<Note>
+Only delete data in `uninstall.php`, never in the deactivation hook. Users often deactivate plugins temporarily without wanting to lose their settings.
+</Note>
+
+## Add some styling
+
+Create a CSS file at `assets/css/product-badge.css`:
+
+```css assets/css/product-badge.css
+.wc-product-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #e63946;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 3px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    z-index: 10;
+}
+```
+
+## Testing your extension
+
+<Steps>
+
+<Step title="Activate the plugin">
+
+Go to **Plugins** in your WordPress admin and activate "WooCommerce Product Badge".
+
+</Step>
+
+<Step title="Create test products">
+
+Create a few products and set some of them on sale by adding a sale price.
+
+</Step>
+
+<Step title="View the shop page">
+
+Visit your shop page to see the custom sale badges on products that are on sale.
+
+</Step>
+
+<Step title="Test deactivation">
+
+Deactivate the plugin and verify that the badges are removed and no errors occur.
+
+</Step>
+
+</Steps>
+
+## Complete file listing
+
+Here's the complete `woocommerce-product-badge.php` file:
+
+<Accordion title="View complete code">
+
+```php woocommerce-product-badge.php
+<?php
+/**
+ * Plugin Name: WooCommerce Product Badge
+ * Plugin URI: https://example.com/woocommerce-product-badge/
+ * Description: Adds custom badges to products on sale in your WooCommerce store.
+ * Version: 1.0.0
+ * Author: Your Name
+ * Author URI: https://example.com/
+ * Developer: Your Name
+ * Developer URI: https://example.com/
+ * Text Domain: woocommerce-product-badge
+ * Domain Path: /languages
+ *
+ * WC requires at least: 8.0
+ * WC tested up to: 8.9
+ *
+ * License: GNU General Public License v3.0
+ * License URI: http://www.gnu.org/licenses/gpl-3.0.html
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Check if WooCommerce is active
+ */
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) {
+    return;
+}
+
+// Define plugin constants
+define( 'WC_PRODUCT_BADGE_VERSION', '1.0.0' );
+define( 'WC_PRODUCT_BADGE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'WC_PRODUCT_BADGE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'WC_PRODUCT_BADGE_PLUGIN_FILE', __FILE__ );
+
+/**
+ * Main plugin class
+ */
+class WC_Product_Badge {
+    
+    /**
+     * Plugin instance
+     *
+     * @var WC_Product_Badge
+     */
+    private static $instance = null;
+    
+    /**
+     * Get plugin instance
+     *
+     * @return WC_Product_Badge
+     */
+    public static function get_instance() {
+        if ( null === self::$instance ) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
+    
+    /**
+     * Constructor
+     */
+    private function __construct() {
+        $this->init_hooks();
+    }
+    
+    /**
+     * Initialize hooks
+     */
+    private function init_hooks() {
+        add_action( 'init', array( $this, 'load_textdomain' ) );
+        add_action( 'woocommerce_before_shop_loop_item_title', array( $this, 'add_sale_badge' ), 10 );
+        add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_styles' ) );
+    }
+    
+    /**
+     * Load plugin text domain
+     */
+    public function load_textdomain() {
+        load_plugin_textdomain(
+            'woocommerce-product-badge',
+            false,
+            dirname( plugin_basename( WC_PRODUCT_BADGE_PLUGIN_FILE ) ) . '/languages'
+        );
+    }
+    
+    /**
+     * Add custom sale badge
+     */
+    public function add_sale_badge() {
+        global $product;
+        
+        if ( $product && $product->is_on_sale() ) {
+            echo '<span class="wc-product-badge">' . esc_html__( 'On Sale!', 'woocommerce-product-badge' ) . '</span>';
+        }
+    }
+    
+    /**
+     * Enqueue frontend styles
+     */
+    public function enqueue_styles() {
+        wp_enqueue_style(
+            'wc-product-badge',
+            WC_PRODUCT_BADGE_PLUGIN_URL . 'assets/css/product-badge.css',
+            array(),
+            WC_PRODUCT_BADGE_VERSION
+        );
+    }
+}
+
+// Initialize the plugin
+WC_Product_Badge::get_instance();
+
+/**
+ * Plugin activation hook
+ */
+function wc_product_badge_activate() {
+    if ( ! class_exists( 'WooCommerce' ) ) {
+        deactivate_plugins( plugin_basename( WC_PRODUCT_BADGE_PLUGIN_FILE ) );
+        wp_die(
+            esc_html__( 'WooCommerce Product Badge requires WooCommerce to be installed and active.', 'woocommerce-product-badge' ),
+            'Plugin dependency check',
+            array( 'back_link' => true )
+        );
+    }
+    
+    add_option( 'wc_product_badge_version', WC_PRODUCT_BADGE_VERSION );
+    add_option( 'wc_product_badge_activated', time() );
+    
+    flush_rewrite_rules();
+}
+register_activation_hook( WC_PRODUCT_BADGE_PLUGIN_FILE, 'wc_product_badge_activate' );
+
+/**
+ * Plugin deactivation hook
+ */
+function wc_product_badge_deactivate() {
+    flush_rewrite_rules();
+}
+register_deactivation_hook( WC_PRODUCT_BADGE_PLUGIN_FILE, 'wc_product_badge_deactivate' );
+```
+
+</Accordion>
+
+## Next steps
+
+Now that you've built your first WooCommerce extension:
+
+1. Review [extension development best practices](/docs/extensions/best-practices)
+2. Learn about the [WooCommerce Settings API](/docs/extensions/settings-api) to add settings pages
+3. Explore [WooCommerce hooks and filters](/docs/extensions/hooks-filters) for more customization options
+4. Add a [changelog file](/docs/extensions/core-concepts/changelog-txt) to track your changes
+5. Study [deactivation and uninstallation](/docs/extensions/core-concepts/handling-deactivation-and-uninstallation) best practices
+
+## Additional resources
+
+- [WordPress Plugin Developer Handbook](https://developer.wordpress.org/plugins/)
+- [WooCommerce Code Reference](https://woocommerce.com/wc-apidocs/)
+- [WordPress Coding Standards](https://developer.wordpress.org/coding-standards/)
+- [Internationalization for WordPress Developers](https://developer.wordpress.org/plugins/internationalization/)

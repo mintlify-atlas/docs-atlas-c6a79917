@@ -1,0 +1,236 @@
+---
+title: "Introduction to WooCommerce Development"
+description: "Welcome to the WooCommerce developer documentation. Learn how to extend and customize WooCommerce."
+---
+
+## What is WooCommerce?
+
+WooCommerce is a customizable, open-source ecommerce platform built on WordPress. It powers millions of online stores worldwide and provides a robust framework for developers to create extensions, themes, and custom integrations.
+
+<CardGroup cols={2}>
+  <Card
+    title="For Extension Developers"
+    icon="puzzle-piece"
+    href="/extensions/getting-started"
+  >
+    Build powerful extensions using WooCommerce's extensive hook system and APIs.
+  </Card>
+  <Card
+    title="For Theme Developers"
+    icon="palette"
+    href="/themes/overview"
+  >
+    Create beautiful, customized storefronts with classic or block themes.
+  </Card>
+  <Card
+    title="For API Integrations"
+    icon="code"
+    href="/api/rest-api/overview"
+  >
+    Integrate with products, orders, and customers via the REST API.
+  </Card>
+  <Card
+    title="For Contributors"
+    icon="code-branch"
+    href="/contributing/overview"
+  >
+    Contribute to the WooCommerce core codebase and help improve the platform.
+  </Card>
+</CardGroup>
+
+## What You Can Build
+
+WooCommerce's flexible architecture enables developers to:
+
+### Extensions
+
+- **Payment Gateways**: Integrate custom payment methods using the Payment Gateway API
+- **Shipping Methods**: Add custom shipping options and integrations
+- **Product Add-ons**: Extend product functionality with custom fields and options
+- **Marketing Tools**: Build integrations for email marketing, analytics, and more
+- **Inventory Management**: Create custom inventory and warehouse management solutions
+
+### Themes
+
+- **Custom Storefronts**: Design unique shopping experiences
+- **Classic Themes**: Build with traditional PHP templates and hooks
+- **Block Themes**: Create modern FSE (Full Site Editing) themes
+- **Mobile-Optimized Designs**: Responsive themes for all devices
+
+### Integrations
+
+- **Headless Commerce**: Build decoupled frontends using the Store API
+- **Third-Party Services**: Connect to CRMs, ERPs, and other business tools
+- **Custom Analytics**: Create specialized reporting and data visualization
+- **Multi-Channel Sales**: Integrate with marketplaces and sales channels
+
+## Developer Ecosystem
+
+<Info>
+WooCommerce has a thriving developer ecosystem with:
+
+- **9,000+ extensions** available on the WooCommerce Marketplace
+- **Active community** on Slack with thousands of developers
+- **Regular releases** with new features and improvements
+- **Comprehensive APIs** for deep integrations
+</Info>
+
+## Architecture Overview
+
+WooCommerce is built as a WordPress plugin with a modern monorepo structure:
+
+```
+woocommerce/
+├── plugins/
+│   └── woocommerce/          # Core plugin
+│       ├── src/              # Modern PHP (PSR-4)
+│       ├── includes/         # Legacy code
+│       └── client/           # React admin
+├── packages/
+│   ├── js/                   # JavaScript packages
+│   └── php/                  # PHP packages
+└── tools/                    # Development tools
+```
+
+### Key Technologies
+
+- **Backend**: PHP 7.4+, WordPress hooks system, PSR-4 autoloading
+- **Frontend**: React, TypeScript, Gutenberg blocks
+- **APIs**: REST API, Store API, PHP class APIs
+- **Build Tools**: PNPM, Webpack, Composer
+
+## Getting Started
+
+<Steps>
+  <Step title="Set up your development environment">
+    Install Node.js, PNPM, PHP, and Composer. Clone the WooCommerce monorepo.
+    
+    ```bash
+    git clone https://github.com/woocommerce/woocommerce.git
+    cd woocommerce
+    nvm install
+    pnpm install
+    ```
+  </Step>
+  
+  <Step title="Build the project">
+    Build all packages and plugins in the monorepo.
+    
+    ```bash
+    pnpm build
+    ```
+  </Step>
+  
+  <Step title="Choose your path">
+    Decide what you want to build:
+    - [Extension development](/extensions/getting-started)
+    - [Theme development](/themes/overview)
+    - [API integration](/api/rest-api/overview)
+    - [Core contribution](/contributing/overview)
+  </Step>
+</Steps>
+
+## Community Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="WooCommerce Slack"
+    icon="slack"
+    href="https://woocommerce.com/community-slack/"
+  >
+    Join the community for help, discussions, and announcements.
+  </Card>
+  <Card
+    title="Developer Blog"
+    icon="newspaper"
+    href="https://developer.woocommerce.com/blog/"
+  >
+    Stay updated with development news and tutorials.
+  </Card>
+  <Card
+    title="GitHub Repository"
+    icon="github"
+    href="https://github.com/woocommerce/woocommerce"
+  >
+    Browse source code, report issues, and submit pull requests.
+  </Card>
+  <Card
+    title="Code Reference"
+    icon="book"
+    href="https://developer.wordpress.org/reference/classes/woocommerce/"
+  >
+    Complete reference for WooCommerce classes and functions.
+  </Card>
+</CardGroup>
+
+## Documentation Structure
+
+This documentation is organized into several sections:
+
+### Documentation Tab
+
+- **Getting Started**: Setup, quickstart, and project overview
+- **Core Concepts**: Architecture, monorepo, modern vs legacy code
+- **Extension Development**: Build extensions using hooks and APIs
+- **Theme Development**: Create custom storefronts
+- **Block Development**: Extend WooCommerce with Gutenberg blocks
+- **Features**: Payment gateways, shipping, analytics, HPOS, and more
+
+### API Reference Tab
+
+- **REST API**: Complete endpoint reference for products, orders, customers
+- **Store API**: Unauthenticated endpoints for headless commerce
+- **PHP APIs**: Payment Gateway, Shipping Method, and Payment Token APIs
+
+### Contributing Tab
+
+- **Contribution Guide**: How to contribute code and documentation
+- **Coding Standards**: PHP and JavaScript style requirements
+- **Testing**: PHPUnit, Jest, and E2E testing guidelines
+- **Git Workflow**: Branching, commits, and pull request process
+
+## Support
+
+<Note>
+This documentation is for **developers**. If you're a merchant or store owner, visit [woocommerce.com](https://woocommerce.com/) for merchant-facing documentation.
+</Note>
+
+### For Developers
+
+- **Community Slack**: Ask questions in developer channels
+- **GitHub Discussions**: Community Q&A and discussions
+- **Stack Overflow**: Tag questions with `woocommerce`
+
+### For Merchants
+
+- [Self-service guide](https://woocommerce.com/document/woocommerce-self-service-guide/)
+- [Premium support portal](https://woocommerce.com/contact-us/)
+- [Community forum on wp.org](https://wordpress.org/support/plugin/woocommerce)
+
+## Next Steps
+
+Ready to start building? Choose your path:
+
+<CardGroup cols={3}>
+  <Card
+    title="Quickstart Guide"
+    icon="rocket"
+    href="/quickstart"
+  >
+    Get up and running in minutes
+  </Card>
+  <Card
+    title="Development Environment"
+    icon="laptop-code"
+    href="/development-environment"
+  >
+    Set up your local environment
+  </Card>
+  <Card
+    title="Project Structure"
+    icon="folder-tree"
+    href="/project-structure"
+  >
+    Understand the monorepo
+  </Card>
+</CardGroup>

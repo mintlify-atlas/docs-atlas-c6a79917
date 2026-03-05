@@ -1,0 +1,443 @@
+---
+title: Monorepo Workflow
+description: Working with WooCommerce's pnpm workspace-based monorepo structure
+---
+
+WooCommerce is organized as a monorepo containing multiple packages, plugins, and tools managed with pnpm workspaces.
+
+## Monorepo Structure
+
+The WooCommerce monorepo contains:
+
+- **Backend**: PHP in `plugins/woocommerce/` (PSR-4, WordPress standards)
+- **Admin Client**: React/TypeScript in `client/admin/`
+- **JavaScript Packages**: Reusable packages in `packages/js/*`
+- **PHP Packages**: Composer packages in `packages/php/*`
+- **Development Tools**: Build and automation tools in `tools/*`
+
+### Workspace Configuration
+
+The monorepo uses pnpm workspaces defined in `pnpm-workspace.yaml`:
+
+```yaml pnpm-workspace.yaml
+packages:
+    - 'packages/js/*'
+    - 'packages/php/*'
+    - 'plugins/*'
+    - 'plugins/woocommerce/client/admin'
+    - 'plugins/woocommerce/client/blocks'
+    - 'plugins/woocommerce/client/legacy'
+    - 'plugins/woocommerce/client/blocks/bin/eslint-plugin-woocommerce'
+    - 'tools/monorepo-merge'
+    - 'tools/code-analyzer'
+    - 'tools/compare-perf'
+    - 'tools/package-release'
+    - 'tools/cherry-pick'
+    - 'tools/release-posts'
+    - 'tools/storybook'
+    - 'tools/monorepo-utils'
+```
+
+### Root Package Configuration
+
+The root `package.json` defines monorepo-wide scripts and dependencies:
+
+```json package.json
+{
+  "name": "woocommerce-monorepo",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": "^20.11.1"
+  },
+  "scripts": {
+    "build": "pnpm -r --workspace-concurrency=Infinity --stream '/^build:project:.*$/',
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "clean": "rimraf -g '**/node_modules' '**/.wireit' 'packages/*/*/vendor' 'plugins/*/vendor'",
+    "clean:build": "rimraf -g 'packages/js/*/build' 'packages/js/*/build-*'"
+  }
+}
+```
+
+<Info>
+  The monorepo uses pnpm 9.15.0 as the package manager. Make sure you have the correct version installed.
+</Info>
+
+## PNPM Workspaces
+
+PNPM workspaces enable efficient dependency management across all packages.
+
+### Filtering Packages
+
+Use the `--filter` flag to run commands on specific packages:
+
+```bash
+# Build WooCommerce Core and all dependencies
+pnpm --filter='@woocommerce/plugin-woocommerce' build
+
+# Lint a specific package
+pnpm --filter='@woocommerce/components' lint
+
+# Test all @woocommerce scoped packages
+pnpm --filter='@woocommerce/*' test
+
+# Build all JavaScript packages
+pnpm --filter='./packages/js/*' build
+
+# Build everything except WooCommerce Core
+pnpm --filter='!@woocommerce/plugin-woocommerce' build
+
+# Build everything that changed since last commit
+pnpm --filter='[HEAD^1]' build
+```
+
+### Workspace Dependencies
+
+Packages can depend on other workspace packages:
+
+```json
+{
+  "dependencies": {
+    "@woocommerce/components": "workspace:*",
+    "@woocommerce/data": "workspace:*"
+  }
+}
+```
+
+<Note>
+  The `workspace:*` protocol ensures packages use local versions during development and resolves to actual versions when published.
+</Note>
+
+## Build System
+
+The monorepo uses multiple build tools depending on the package type.
+
+### JavaScript Build Tools
+
+JavaScript packages use a combination of:
+
+- **Webpack**: For bundling client applications
+- **TypeScript**: For type-safe JavaScript
+- **Wireit**: For incremental builds and caching
+- **Babel**: For JavaScript transpilation
+
+### PHP Build Tools
+
+PHP packages use:
+
+- **Composer**: For PHP dependencies
+- **PHPStan**: For static analysis
+- **PHPCS**: For code style checking
+- **PHPUnit**: For testing
+
+### Build Commands
+
+<Tabs>
+  <Tab title="Build All">
+    ```bash
+    # Build all packages in the monorepo
+    pnpm build
+    
+    # Build and watch for changes
+    pnpm start
+    ```
+  </Tab>
+  
+  <Tab title="Build Specific Package">
+    ```bash
+    # Build WooCommerce Core
+    pnpm --filter='@woocommerce/plugin-woocommerce' build
+    
+    # Build admin client
+    pnpm --filter='@woocommerce/admin-client' build
+    ```
+  </Tab>
+  
+  <Tab title="Clean Build">
+    ```bash
+    # Clean all build artifacts
+    pnpm clean:build
+    
+    # Clean and rebuild
+    pnpm clean:build && pnpm build
+    ```
+  </Tab>
+</Tabs>
+
+## Package Dependencies
+
+The monorepo manages dependencies at multiple levels.
+
+### Dependency Resolution
+
+PNPM creates a single `node_modules` structure with symlinks:
+
+```
+node_modules/
+├── @woocommerce/
+│   ├── components -> ../../packages/js/components
+│   ├── data -> ../../packages/js/data
+│   └── plugin-woocommerce -> ../../plugins/woocommerce
+└── react
+```
+
+### Shared Dependencies
+
+Common dependencies are hoisted to the root to save disk space:
+
+```json package.json
+{
+  "dependencies": {
+    "@babel/core": "7.25.7",
+    "lodash": "^4.17.21",
+    "wp-textdomain": "1.0.1"
+  },
+  "pnpm": {
+    "overrides": {
+      "@types/react": "18.3.x",
+      "@wordpress/data": "wp-6.6"
+    }
+  }
+}
+```
+
+### Version Synchronization
+
+The monorepo uses syncpack to keep dependencies aligned:
+
+```bash
+# Check for version mismatches
+pnpm sync-dependencies
+```
+
+## Development Scripts
+
+Common development tasks have dedicated scripts.
+
+### Testing Scripts
+
+```bash
+# Run PHP unit tests (from plugins/woocommerce)
+pnpm test:php:env -- --filter TestClassName
+
+# Run JavaScript tests
+pnpm --filter='@woocommerce/components' test
+
+# Run all tests
+pnpm test
+```
+
+### Linting Scripts
+
+```bash
+# Lint all packages
+pnpm lint
+
+# Lint changed PHP files only
+pnpm --filter='@woocommerce/plugin-woocommerce' lint:php:changes
+
+# Fix linting issues
+pnpm --filter='@woocommerce/plugin-woocommerce' lint:php:fix -- path/to/file.php
+
+# Run PHPStan analysis (from plugins/woocommerce)
+composer exec -- phpstan analyse src/Internal/MyClass.php --memory-limit=2G
+```
+
+### Changelog Scripts
+
+<Warning>
+  Always create changelog entries before creating a pull request. PRs without changelog entries will fail CI checks.
+</Warning>
+
+```bash
+# Add changelog entry for WooCommerce Core
+pnpm --filter='@woocommerce/plugin-woocommerce' changelog add
+
+# Add changelog for specific package
+pnpm --filter='@woocommerce/components' changelog add
+```
+
+## Development Tools
+
+The `tools/` directory contains utilities for monorepo development.
+
+### Monorepo Utils
+
+Command-line tools for common tasks:
+
+```bash
+# Run monorepo utilities
+pnpm utils <command>
+```
+
+### Code Analyzer
+
+Analyze code changes and dependencies:
+
+```bash
+pnpm --filter='@woocommerce/code-analyzer' run analyze
+```
+
+### Cherry Pick Tool
+
+Backport changes between branches:
+
+```bash
+pnpm cherry-pick <commit-hash>
+```
+
+## Common Workflows
+
+<Steps>
+  <Step title="Clone and Install">
+    ```bash
+    git clone https://github.com/woocommerce/woocommerce.git
+    cd woocommerce
+    pnpm install
+    ```
+  </Step>
+  
+  <Step title="Build Everything">
+    ```bash
+    # Initial build of all packages
+    pnpm build
+    ```
+  </Step>
+  
+  <Step title="Start Development Environment">
+    ```bash
+    # Navigate to plugin directory
+    cd plugins/woocommerce
+    
+    # Start WordPress environment
+    pnpm -- wp-env start
+    ```
+  </Step>
+  
+  <Step title="Make Changes and Test">
+    ```bash
+    # Make code changes, then run tests
+    pnpm test:php:env
+    pnpm lint:php:changes
+    ```
+  </Step>
+  
+  <Step title="Create Changelog">
+    ```bash
+    # Add changelog entry
+    pnpm --filter='@woocommerce/plugin-woocommerce' changelog add
+    ```
+  </Step>
+</Steps>
+
+## Package Organization
+
+### JavaScript Packages (`packages/js/`)
+
+- `@woocommerce/components`: Reusable React components
+- `@woocommerce/data`: Data stores and API client
+- `@woocommerce/navigation`: Navigation utilities
+- `@woocommerce/date`: Date manipulation utilities
+- `@woocommerce/currency`: Currency formatting
+- And many more...
+
+### PHP Packages (`packages/php/`)
+
+- `@woocommerce/blueprint`: Blueprint specifications
+- `@woocommerce/email-editor`: Email customization
+- `@woocommerce/remote-specs-validation`: Remote spec validation
+
+### Plugins
+
+- `@woocommerce/plugin-woocommerce`: WooCommerce Core
+- `@woocommerce/woocommerce-beta-tester`: Beta testing plugin
+
+## Performance Optimization
+
+### Incremental Builds
+
+Wireit enables incremental builds:
+
+```json
+{
+  "scripts": {
+    "build": "wireit"
+  },
+  "wireit": {
+    "build": {
+      "dependencies": ["build:deps"],
+      "files": ["src/**"],
+      "output": ["build/**"]
+    }
+  }
+}
+```
+
+### Parallel Execution
+
+PNPM runs independent tasks in parallel:
+
+```bash
+# Run tests in all packages concurrently
+pnpm -r --parallel test
+```
+
+### Build Caching
+
+Wireit caches build outputs to skip unchanged packages:
+
+```bash
+# First build (slow)
+pnpm build
+
+# Second build (fast - uses cache)
+pnpm build
+```
+
+<Info>
+  Build caches are stored in `.wireit` directories. These are automatically cleaned by `pnpm clean`.
+</Info>
+
+## Troubleshooting
+
+### Clean Installation
+
+If you encounter dependency issues:
+
+```bash
+# Remove all node_modules and reinstall
+pnpm clean
+pnpm install
+```
+
+### Lock File Issues
+
+If pnpm-lock.yaml gets out of sync:
+
+```bash
+# Regenerate lock file
+rm pnpm-lock.yaml
+pnpm install
+```
+
+### Build Failures
+
+If builds fail after pulling changes:
+
+```bash
+# Clean build artifacts and rebuild
+pnpm clean:build
+pnpm build
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture" icon="sitemap" href="/core-concepts/architecture">
+    Understand WooCommerce's overall architecture
+  </Card>
+  
+  <Card title="Modern vs Legacy" icon="code-compare" href="/core-concepts/modern-vs-legacy">
+    Learn about code organization patterns
+  </Card>
+</CardGroup>

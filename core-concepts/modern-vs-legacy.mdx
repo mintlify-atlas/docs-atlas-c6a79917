@@ -1,0 +1,526 @@
+---
+title: Modern vs Legacy Code
+description: Understanding the difference between src/ and includes/ directories and when to use each
+---
+
+WooCommerce maintains two distinct code organization patterns to balance modern PHP practices with backwards compatibility.
+
+## Code Organization
+
+WooCommerce code is split into two main directories:
+
+- **`src/`**: Modern PHP with PSR-4 autoloading and dependency injection
+- **`includes/`**: Legacy WordPress patterns for backwards compatibility
+
+```
+plugins/woocommerce/
+├── src/                    # Modern PHP code (PSR-4, DI container)
+│   ├── Internal/           # Internal classes (default location)
+│   ├── Container.php       # DI container implementation
+│   └── Autoloader.php      # PSR-4 autoloader
+├── includes/               # Legacy WordPress code
+│   ├── class-woocommerce.php  # Main plugin class
+│   └── wc-*.php           # Global functions
+└── tests/php/              # PHPUnit tests
+    ├── src/                # Tests for modern code
+    └── includes/           # Tests for legacy code
+```
+
+## Modern Code (`src/` Directory)
+
+The `src/` directory contains modern PHP code following current best practices.
+
+### PSR-4 Autoloading
+
+All classes in `src/` use PSR-4 autoloading with proper namespaces:
+
+```php src/Internal/AssignDefaultCategory.php
+<?php
+/**
+ * AssignDefaultCategory class file.
+ */
+
+namespace Automattic\WooCommerce\Internal;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Class to assign default category to products.
+ */
+class AssignDefaultCategory {
+    /**
+     * Class initialization, to be executed when the class is resolved by the container.
+     *
+     * @internal
+     */
+    final public function init() {
+        add_action( 'wc_schedule_update_product_default_cat', 
+            array( $this, 'maybe_assign_default_product_cat' ) 
+        );
+    }
+
+    public function maybe_assign_default_product_cat() {
+        global $wpdb;
+        // Implementation...
+    }
+}
+```
+
+### Namespace Structure
+
+<Tabs>
+  <Tab title="Root Namespace">
+    `Automattic\WooCommerce\`
+    
+    The base namespace for all WooCommerce code.
+  </Tab>
+  
+  <Tab title="Internal Classes">
+    `Automattic\WooCommerce\Internal\*`
+    
+    Default location for new internal classes. These are not part of the public API.
+    
+    ```php
+    namespace Automattic\WooCommerce\Internal;
+    
+    class AssignDefaultCategory { }
+    ```
+  </Tab>
+  
+  <Tab title="Public API Classes">
+    `Automattic\WooCommerce\*` (root level)
+    
+    Public-facing classes that extensions can depend on.
+    
+    ```php
+    namespace Automattic\WooCommerce;
+    
+    class Container { }
+    ```
+  </Tab>
+  
+  <Tab title="Specialized Namespaces">
+    Feature-specific namespaces:
+    
+    - `Automattic\WooCommerce\Blocks\*`
+    - `Automattic\WooCommerce\StoreApi\*`
+    - `Automattic\WooCommerce\Utilities\*`
+  </Tab>
+</Tabs>
+
+### Modern Features
+
+Modern code uses contemporary PHP features:
+
+```php
+<?php
+
+declare( strict_types=1 );
+
+namespace Automattic\WooCommerce\Internal\DependencyManagement;
+
+class RuntimeContainer {
+    /**
+     * Root namespace constant.
+     */
+    const WOOCOMMERCE_NAMESPACE = 'Automattic\\WooCommerce\\';
+
+    /**
+     * Cache of classes already resolved.
+     *
+     * @var array
+     */
+    protected array $resolved_cache;
+
+    /**
+     * Get an instance of a class.
+     *
+     * @template T of object
+     * @param string $class_name Class name.
+     * @phpstan-param class-string<T> $class_name
+     *
+     * @return T Object instance.
+     * @throws ContainerException Error when resolving the class.
+     */
+    public function get( string $class_name ) {
+        // Implementation...
+    }
+}
+```
+
+<Info>
+  Modern code features:
+  - Strict type declarations
+  - Type hints for parameters and return values
+  - Array type properties (PHP 7.4+)
+  - PHPDoc templates for generics
+  - Constant visibility modifiers
+</Info>
+
+### Dependency Injection
+
+Classes in `src/` use constructor injection or the `init()` method for dependencies:
+
+```php src/Internal/Admin/Analytics.php
+namespace Automattic\WooCommerce\Internal\Admin;
+
+use Automattic\WooCommerce\Admin\API\Reports\Cache;
+use Automattic\WooCommerce\Utilities\OrderUtil;
+
+class Analytics {
+    /**
+     * Dependencies are injected via init() method.
+     */
+    public function init( Cache $cache, OrderUtil $order_util ) {
+        // Hook registration happens here
+        add_filter( 'woocommerce_component_settings_preload_endpoints', 
+            array( $this, 'add_preload_endpoints' ) 
+        );
+    }
+}
+```
+
+### The `init()` Method Pattern
+
+All classes in `src/` that need initialization should implement an `init()` method:
+
+```php
+class MyFeature {
+    /**
+     * Class initialization, to be executed when the class is resolved by the container.
+     *
+     * @internal
+     */
+    final public function init() {
+        // Register hooks
+        add_action( 'init', array( $this, 'setup' ) );
+        add_filter( 'some_filter', array( $this, 'filter_callback' ) );
+    }
+    
+    public function setup() {
+        // Setup logic
+    }
+    
+    public function filter_callback( $value ) {
+        return $value;
+    }
+}
+```
+
+<Warning>
+  The `init()` method should be marked as `final` and should be `public`. It's called automatically by the dependency injection container.
+</Warning>
+
+## Legacy Code (`includes/` Directory)
+
+The `includes/` directory maintains backwards compatibility with traditional WordPress patterns.
+
+### WordPress Patterns
+
+Legacy code uses classic WordPress coding styles:
+
+```php includes/class-woocommerce.php
+<?php
+/**
+ * WooCommerce setup
+ *
+ * @package WooCommerce
+ * @since   3.2.0
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+use Automattic\WooCommerce\Internal\AssignDefaultCategory;
+use Automattic\WooCommerce\Internal\DataStores\Orders\CustomOrdersTableController;
+
+/**
+ * Main WooCommerce Class.
+ *
+ * @class WooCommerce
+ */
+final class WooCommerce {
+    /**
+     * WooCommerce version.
+     *
+     * @var string
+     */
+    public $version = '10.7.0-dev';
+
+    /**
+     * The single instance of the class.
+     *
+     * @var WooCommerce
+     */
+    protected static $_instance = null;
+
+    /**
+     * Main WooCommerce Instance.
+     *
+     * @static
+     * @return WooCommerce - Main instance.
+     */
+    public static function instance() {
+        if ( is_null( self::$_instance ) ) {
+            self::$_instance = new self();
+        }
+        return self::$_instance;
+    }
+}
+```
+
+### Global Functions
+
+Legacy code includes global helper functions:
+
+```php includes/wc-template-functions.php
+<?php
+
+use Automattic\WooCommerce\Internal\Utilities\HtmlSanitizer;
+
+/**
+ * Handle redirects before content is output.
+ *
+ * @return void
+ */
+function wc_template_redirect() {
+    global $wp_query, $wp;
+    
+    // Redirect logic
+    if ( is_page( wc_get_page_id( 'checkout' ) ) && WC()->cart->is_empty() ) {
+        wp_safe_redirect( wc_get_cart_url() );
+        exit;
+    }
+}
+```
+
+### Singleton Pattern
+
+Many legacy classes use the singleton pattern:
+
+```php
+class WC_Legacy_Class {
+    protected static $_instance = null;
+    
+    public static function instance() {
+        if ( is_null( self::$_instance ) ) {
+            self::$_instance = new self();
+        }
+        return self::$_instance;
+    }
+    
+    private function __construct() {
+        // Constructor is private to enforce singleton
+    }
+}
+```
+
+### Direct WordPress API Calls
+
+Legacy code calls WordPress functions directly:
+
+```php
+// Direct WordPress API usage
+global $wpdb;
+$results = $wpdb->get_results( "SELECT * FROM {$wpdb->posts}" );
+
+// Direct option access
+update_option( 'woocommerce_setting', $value );
+```
+
+## When to Use Each
+
+Choose the right directory based on what you're building.
+
+### Use `src/` For:
+
+<Steps>
+  <Step title="New Features">
+    All new functionality should be implemented in `src/` using modern patterns.
+    
+    ```php src/Internal/MyNewFeature.php
+    namespace Automattic\WooCommerce\Internal;
+    
+    class MyNewFeature {
+        final public function init() {
+            // Implementation
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Internal Classes">
+    Classes that are not part of the public API go in `src/Internal/`.
+    
+    Default location: `src/Internal/`
+  </Step>
+  
+  <Step title="Testable Code">
+    Code that needs dependency injection for testing.
+    
+    ```php
+    // Easy to test with mocked dependencies
+    public function init( PaymentGateway $gateway, Logger $logger ) {
+        $this->gateway = $gateway;
+        $this->logger = $logger;
+    }
+    ```
+  </Step>
+  
+  <Step title="Modern PHP Features">
+    When you need strict types, type hints, or other modern PHP features.
+  </Step>
+</Steps>
+
+### Use `includes/` For:
+
+<Steps>
+  <Step title="Backwards Compatibility">
+    Modifying existing functionality that extensions depend on.
+  </Step>
+  
+  <Step title="Bug Fixes">
+    Fixing bugs in existing legacy code (minimal changes only).
+  </Step>
+  
+  <Step title="Global Functions">
+    Template functions and utilities that themes/plugins call directly.
+  </Step>
+</Steps>
+
+<Warning>
+  Minimize changes to `includes/` directory. New code should always go in `src/`.
+</Warning>
+
+## Migration Approach
+
+When refactoring legacy code to modern patterns:
+
+### Step 1: Create Modern Class
+
+Create a new class in `src/Internal/`:
+
+```php src/Internal/MyModernClass.php
+namespace Automattic\WooCommerce\Internal;
+
+class MyModernClass {
+    final public function init() {
+        // New implementation
+    }
+    
+    public function handle_action() {
+        // Business logic
+    }
+}
+```
+
+### Step 2: Register with Container
+
+The container automatically resolves classes in the `Automattic\WooCommerce` namespace.
+
+### Step 3: Update Legacy Code
+
+Update legacy code to use the new class:
+
+```php includes/class-wc-legacy.php
+class WC_Legacy {
+    public function __construct() {
+        // Get modern class from container
+        $modern_class = wc_get_container()->get( 
+            \Automattic\WooCommerce\Internal\MyModernClass::class 
+        );
+    }
+}
+```
+
+### Step 4: Deprecate Legacy Code
+
+Mark old code as deprecated:
+
+```php
+/**
+ * @deprecated 10.7.0 Use MyModernClass instead.
+ */
+function wc_old_function() {
+    wc_deprecated_function( __FUNCTION__, '10.7.0', 'MyModernClass::handle_action' );
+    
+    // Call new implementation
+    return wc_get_container()
+        ->get( MyModernClass::class )
+        ->handle_action();
+}
+```
+
+## Key Differences Summary
+
+| Feature | `src/` (Modern) | `includes/` (Legacy) |
+|---------|----------------|---------------------|
+| **Autoloading** | PSR-4 | Manual includes |
+| **Namespaces** | Required | Optional |
+| **Dependencies** | Dependency injection | Global access |
+| **Type Hints** | Required | Optional |
+| **Strict Types** | Yes | No |
+| **Hooks** | In `init()` method | In constructor |
+| **Singleton** | No (container manages) | Yes (manual) |
+| **Testing** | Easy (mockable) | Difficult |
+| **New Code** | Yes | Only for fixes |
+
+## Best Practices
+
+<Steps>
+  <Step title="Default to Modern">
+    Always create new code in `src/` unless you have a specific reason not to.
+  </Step>
+  
+  <Step title="Use Internal Namespace">
+    Place new classes in `src/Internal/` by default.
+    
+    ```php
+    namespace Automattic\WooCommerce\Internal;
+    ```
+  </Step>
+  
+  <Step title="Implement init() Method">
+    Use the `init()` method for hook registration and initialization.
+    
+    ```php
+    final public function init() {
+        add_action( 'init', array( $this, 'setup' ) );
+    }
+    ```
+  </Step>
+  
+  <Step title="Use Type Hints">
+    Always use type hints for parameters and return values.
+    
+    ```php
+    public function process_order( Order $order ): bool {
+        // Implementation
+    }
+    ```
+  </Step>
+  
+  <Step title="Declare Strict Types">
+    Start files with `declare( strict_types=1 );`
+    
+    ```php
+    <?php
+    declare( strict_types=1 );
+    ```
+  </Step>
+  
+  <Step title="Minimal Legacy Changes">
+    Only modify `includes/` for critical bug fixes.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Dependency Injection" icon="plug" href="/core-concepts/dependency-injection">
+    Learn how to use the DI container in modern code
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/core-concepts/architecture">
+    Understand the overall WooCommerce architecture
+  </Card>
+</CardGroup>

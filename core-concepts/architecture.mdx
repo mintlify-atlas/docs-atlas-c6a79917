@@ -1,0 +1,263 @@
+---
+title: WooCommerce Architecture
+description: Understanding WooCommerce's architecture as a WordPress plugin with modern PHP patterns
+---
+
+WooCommerce is built as a WordPress plugin with a hybrid architecture that bridges legacy WordPress patterns and modern PHP development practices.
+
+## WordPress Plugin Foundation
+
+At its core, WooCommerce is a WordPress plugin that extends WordPress functionality to provide e-commerce capabilities. The plugin integrates deeply with WordPress through:
+
+### Plugin Entry Point
+
+The main plugin file `woocommerce.php` bootstraps the entire system:
+
+```php plugins/woocommerce/woocommerce.php
+// Load core packages and the autoloader
+require __DIR__ . '/src/Autoloader.php';
+require __DIR__ . '/src/Packages.php';
+
+if ( ! \Automattic\WooCommerce\Autoloader::init() ) {
+    return;
+}
+\Automattic\WooCommerce\Packages::init();
+
+// Include the main WooCommerce class
+if ( ! class_exists( 'WooCommerce', false ) ) {
+    include_once dirname( WC_PLUGIN_FILE ) . '/includes/class-woocommerce.php';
+}
+
+// Initialize dependency injection
+$GLOBALS['wc_container'] = new Automattic\WooCommerce\Container();
+```
+
+### Main Plugin Class
+
+The `WooCommerce` class in `includes/class-woocommerce.php` manages the plugin lifecycle:
+
+```php
+final class WooCommerce {
+    /**
+     * WooCommerce version.
+     */
+    public $version = '10.7.0-dev';
+
+    /**
+     * Session instance.
+     */
+    public $session = null;
+
+    /**
+     * Query instance.
+     */
+    public $query = null;
+
+    /**
+     * Product factory instance.
+     */
+    public $product_factory = null;
+}
+```
+
+## Hook System
+
+WooCommerce leverages WordPress's action and filter hook system extensively for extensibility.
+
+### Actions and Filters
+
+The hook system allows plugins and themes to modify WooCommerce behavior without modifying core files:
+
+```php
+// Legacy code using hooks directly
+add_action( 'wc_schedule_update_product_default_cat', array( $this, 'maybe_assign_default_product_cat' ) );
+
+// Modern code using hooks in init() method
+final public function init() {
+    add_action( 'wc_schedule_update_product_default_cat', array( $this, 'maybe_assign_default_product_cat' ) );
+}
+```
+
+<Info>
+  All hook registration in modern code (`src/` directory) should happen in the `init()` method of the class.
+</Info>
+
+### Template System
+
+WooCommerce uses a template hierarchy system similar to WordPress themes:
+
+```php plugins/woocommerce/includes/wc-template-functions.php
+use Automattic\WooCommerce\Blocks\Utils\CartCheckoutUtils;
+use Automattic\WooCommerce\Enums\OrderStatus;
+use Automattic\WooCommerce\Internal\Utilities\HtmlSanitizer;
+
+function wc_template_redirect() {
+    global $wp_query, $wp;
+    
+    // When on the checkout with an empty cart, redirect to cart page
+    if ( is_page( wc_get_page_id( 'checkout' ) ) && WC()->cart->is_empty() ) {
+        wp_safe_redirect( wc_get_cart_url() );
+        exit;
+    }
+}
+```
+
+## API Layers
+
+WooCommerce provides multiple API layers for different use cases:
+
+### REST API
+
+The WordPress REST API integration provides endpoints for external integrations:
+
+- **Store API**: Modern API for blocks and frontend applications (`/wc/store/v1/*`)
+- **WC REST API**: Admin and integration API (`/wc/v3/*`)
+- **Legacy API**: Deprecated older API versions
+
+### Data Store Abstraction
+
+WooCommerce uses data store classes to abstract database operations:
+
+```php
+// Custom Orders Table (HPOS) data store
+use Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableDataStore;
+
+// Product data store
+use Automattic\WooCommerce\Internal\DataStores\Products\ProductDataStore;
+```
+
+### Container-Based Services
+
+Modern code uses the dependency injection container to access services:
+
+```php
+// Getting the container
+$container = wc_get_container();
+
+// Resolving a service
+$service = $container->get( SomeService::class );
+```
+
+## Modern vs Legacy Code Patterns
+
+WooCommerce architecture includes two distinct coding approaches:
+
+### Legacy Patterns (`includes/` directory)
+
+- Global functions and variables
+- Direct WordPress API calls
+- Singleton pattern for main classes
+- Hook registration in constructors
+
+```php includes/class-woocommerce.php
+final class WooCommerce {
+    protected static $_instance = null;
+    
+    public static function instance() {
+        if ( is_null( self::$_instance ) ) {
+            self::$_instance = new self();
+        }
+        return self::$_instance;
+    }
+}
+```
+
+### Modern Patterns (`src/` directory)
+
+- PSR-4 autoloading
+- Dependency injection
+- Type hints and strict types
+- Separation of concerns
+
+```php src/Internal/AssignDefaultCategory.php
+namespace Automattic\WooCommerce\Internal;
+
+class AssignDefaultCategory {
+    /**
+     * Class initialization via DI container.
+     *
+     * @internal
+     */
+    final public function init() {
+        add_action( 'wc_schedule_update_product_default_cat', 
+            array( $this, 'maybe_assign_default_product_cat' ) 
+        );
+    }
+}
+```
+
+<Note>
+  New code should always be written in the `src/` directory using modern patterns. The `includes/` directory is maintained for backwards compatibility.
+</Note>
+
+## Directory Structure
+
+The architecture is reflected in the directory organization:
+
+```
+plugins/woocommerce/
+├── src/                    # Modern PHP code (PSR-4, DI container)
+│   ├── Internal/           # Internal classes (default location)
+│   ├── Container.php       # DI container
+│   ├── Autoloader.php      # PSR-4 autoloader
+│   └── Packages.php        # Package management
+├── includes/               # Legacy WordPress code
+│   ├── class-woocommerce.php  # Main plugin class
+│   └── wc-*.php           # Legacy functions
+├── tests/php/              # PHPUnit tests
+│   ├── includes/           # Tests for legacy code
+│   └── src/                # Tests for modern code
+└── client/                 # Frontend applications
+    ├── admin/              # Admin React app
+    └── blocks/             # Block editor components
+```
+
+## Namespace Organization
+
+All modern code uses the `Automattic\WooCommerce` namespace:
+
+- **Root namespace**: `Automattic\WooCommerce`
+- **Internal classes**: `Automattic\WooCommerce\Internal\*`
+- **Public API classes**: `Automattic\WooCommerce\*` (root level)
+- **Blocks**: `Automattic\WooCommerce\Blocks\*`
+- **Store API**: `Automattic\WooCommerce\StoreApi\*`
+
+<Warning>
+  Classes in the `Internal` namespace are not part of the public API and may change without notice. Extension developers should not depend on internal classes.
+</Warning>
+
+## Key Architectural Principles
+
+<Steps>
+  <Step title="Backwards Compatibility">
+    Maintain compatibility with existing extensions and themes by preserving legacy patterns in `includes/`.
+  </Step>
+  
+  <Step title="Progressive Enhancement">
+    Add new features using modern patterns in `src/` while keeping legacy code functional.
+  </Step>
+  
+  <Step title="Separation of Concerns">
+    Use dependency injection and single-responsibility classes in modern code.
+  </Step>
+  
+  <Step title="WordPress Integration">
+    Leverage WordPress APIs (hooks, caching, database) while abstracting them in modern code.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Monorepo Workflow" icon="folder-tree" href="/core-concepts/monorepo">
+    Learn about the pnpm workspace structure and build tools
+  </Card>
+  
+  <Card title="Modern vs Legacy" icon="code-compare" href="/core-concepts/modern-vs-legacy">
+    Understand when to use src/ vs includes/ directories
+  </Card>
+  
+  <Card title="Dependency Injection" icon="plug" href="/core-concepts/dependency-injection">
+    Master the DI container and service resolution
+  </Card>
+</CardGroup>

@@ -1,0 +1,804 @@
+---
+title: Theme Customization
+description: Comprehensive guide to customizing WooCommerce themes with CSS, hooks, child themes, and development best practices
+---
+
+# Theme Customization
+
+Customizing WooCommerce themes requires understanding CSS styling, WordPress hooks, child theme architecture, and upgrade-safe development practices. This guide covers all aspects of theme customization from basic styling to advanced functionality modifications.
+
+## Child Themes
+
+Child themes provide an upgrade-safe way to customize parent themes. Changes in child themes persist through parent theme updates, preventing loss of customizations.
+
+<Info>
+This section covers **classic child themes**. For block theme child themes, see the [WordPress Block Child Theme Guide](https://learn.wordpress.org/lesson-plan/create-a-basic-child-theme-for-block-themes/).
+</Info>
+
+### Why Use Child Themes?
+
+<CardGroup cols={2}>
+  <Card title="Update Safety" icon="shield-check">
+    Customizations survive parent theme updates without being overwritten
+  </Card>
+  
+  <Card title="Organized Customization" icon="folder">
+    All modifications live in one directory, separate from parent theme
+  </Card>
+  
+  <Card title="Easy Rollback" icon="rotate-left">
+    Deactivate child theme to revert to parent theme instantly
+  </Card>
+  
+  <Card title="Development Flexibility" icon="code">
+    Override any parent template or add new functionality independently
+  </Card>
+</CardGroup>
+
+### Creating a Child Theme
+
+<Steps>
+  <Step title="Create Child Theme Directory">
+    Create a new directory in `wp-content/themes/`:
+    
+    ```
+    wp-content/themes/storefront-child/
+    ```
+    
+    Name it descriptively: `parenttheme-child`
+  </Step>
+  
+  <Step title="Create style.css">
+    Create `style.css` with required header information:
+    
+    ```css
+    /*
+    Theme Name:   Storefront Child
+    Theme URI:    https://example.com/storefront-child
+    Description:  Child theme for Storefront
+    Author:       Your Name
+    Author URI:   https://example.com
+    Template:     storefront
+    Version:      1.0.0
+    License:      GNU General Public License v2 or later
+    License URI:  http://www.gnu.org/licenses/gpl-2.0.html
+    Text Domain:  storefront-child
+    */
+    
+    /* --------------- Theme customization starts here ----------------- */
+    ```
+    
+    **Critical:** `Template` must match parent theme directory name exactly.
+  </Step>
+  
+  <Step title="Create functions.php">
+    Create a blank `functions.php` file:
+    
+    ```php
+    <?php
+    /**
+     * Storefront Child Theme Functions
+     */
+    
+    // Add your custom functions here
+    ```
+    
+    <Warning>
+    Do NOT copy parent theme's `functions.php` content. Child theme `functions.php` loads **before** parent theme's.
+    </Warning>
+  </Step>
+  
+  <Step title="Activate Child Theme">
+    Go to **Appearance → Themes** and activate your child theme. The parent theme must remain installed.
+  </Step>
+</Steps>
+
+### Child Theme File Structure
+
+```
+storefront-child/
+├── style.css              # Required: Theme stylesheet and metadata
+├── functions.php          # Theme functions and hooks
+├── screenshot.png         # Theme thumbnail (880x660px recommended)
+├── woocommerce/          # WooCommerce template overrides
+│   ├── single-product.php
+│   ├── archive-product.php
+│   └── cart/
+│       └── cart.php
+├── template-parts/        # Custom template parts
+├── assets/
+│   ├── css/
+│   │   └── custom.css
+│   ├── js/
+│   │   └── custom.js
+│   └── images/
+└── languages/             # Translation files
+```
+
+## CSS Customization
+
+CSS provides the primary method for visual customization. WooCommerce includes comprehensive CSS architecture that can be extended or completely replaced.
+
+### Basic CSS Overrides
+
+Add custom CSS to child theme's `style.css`:
+
+```css
+/* Customize WooCommerce buttons */
+.woocommerce a.button,
+.woocommerce button.button,
+.woocommerce input.button,
+.woocommerce #respond input#submit {
+    background-color: #2c3e50;
+    color: #ffffff;
+    border-radius: 4px;
+    padding: 12px 24px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.woocommerce a.button:hover,
+.woocommerce button.button:hover,
+.woocommerce input.button:hover {
+    background-color: #34495e;
+}
+
+/* Product page layout */
+.woocommerce div.product .summary {
+    margin-bottom: 2rem;
+}
+
+.woocommerce div.product .woocommerce-product-gallery {
+    margin-bottom: 2rem;
+}
+
+/* Price styling */
+.woocommerce div.product p.price,
+.woocommerce div.product span.price {
+    color: #e63946;
+    font-size: 1.75rem;
+    font-weight: 700;
+}
+
+/* Sale badge */
+.woocommerce span.onsale {
+    background-color: #e63946;
+    color: #ffffff;
+    border-radius: 50%;
+    padding: 0.5rem;
+}
+```
+
+### Targeting WooCommerce Body Classes
+
+WooCommerce adds helpful body classes for targeting specific pages:
+
+```css
+/* Shop page only */
+.woocommerce-shop .site-header {
+    background-color: #f8f9fa;
+}
+
+/* Single product pages */
+.single-product .site-main {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Product category pages */
+.woocommerce-archive .woocommerce-breadcrumb {
+    margin-bottom: 2rem;
+}
+
+/* Cart page */
+.woocommerce-cart .woocommerce {
+    padding: 2rem;
+}
+
+/* Checkout page */
+.woocommerce-checkout .woocommerce-form-coupon-toggle {
+    display: none;
+}
+```
+
+### Product Loop Customization
+
+Customize product grid displays:
+
+```css
+/* Product grid layout */
+.woocommerce ul.products {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 2rem;
+}
+
+.woocommerce ul.products li.product {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.woocommerce ul.products li.product:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Product images in loop */
+.woocommerce ul.products li.product img {
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+/* Product titles */
+.woocommerce ul.products li.product .woocommerce-loop-product__title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+/* Add to cart buttons in loop */
+.woocommerce ul.products li.product .button {
+    width: 100%;
+    text-align: center;
+}
+```
+
+### Responsive Design
+
+Add mobile-responsive styles:
+
+```css
+/* Mobile styles */
+@media (max-width: 768px) {
+    .woocommerce div.product div.images,
+    .woocommerce div.product div.summary {
+        width: 100%;
+        float: none;
+    }
+    
+    .woocommerce table.shop_table {
+        font-size: 0.875rem;
+    }
+    
+    .woocommerce ul.products {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .woocommerce ul.products {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+/* Desktop styles */
+@media (min-width: 1025px) {
+    .woocommerce ul.products {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+```
+
+### Disabling WooCommerce Styles
+
+For complete CSS control, disable WooCommerce's default stylesheet:
+
+```php
+// In child theme's functions.php
+add_filter( 'woocommerce_enqueue_styles', '__return_false' );
+```
+
+<Warning>
+Disabling WooCommerce styles requires styling **all** WooCommerce elements from scratch. Only use this for complete redesigns. See the [WooCommerce Theme Testing Checklist](https://developer.files.wordpress.com/2017/12/woocommerce-theme-testing-checklist.pdf) for elements that need styling.
+</Warning>
+
+## Hooks and Filters
+
+WordPress hooks provide upgrade-safe functionality customization without modifying core files.
+
+### Understanding Actions vs Filters
+
+<Tabs>
+  <Tab title="Actions">
+    **Actions** execute functions at specific points. Use for adding/removing content.
+    
+    ```php
+    // Add custom content after product title
+    add_action( 'woocommerce_single_product_summary', 'mytheme_custom_badge', 6 );
+    
+    function mytheme_custom_badge() {
+        global $product;
+        
+        if ( $product->is_featured() ) {
+            echo '<div class="featured-badge">Featured Product</div>';
+        }
+    }
+    ```
+    
+    **Priority matters:** Lower numbers execute earlier (default is 10).
+  </Tab>
+  
+  <Tab title="Filters">
+    **Filters** modify data before use. Use for changing values or output.
+    
+    ```php
+    // Modify "Add to cart" button text
+    add_filter( 'woocommerce_product_single_add_to_cart_text', 'mytheme_custom_cart_button_text' );
+    
+    function mytheme_custom_cart_button_text( $text ) {
+        return 'Buy Now';
+    }
+    ```
+    
+    Always return modified value in filter functions.
+  </Tab>
+</Tabs>
+
+### Common Customization Hooks
+
+<CodeGroup>
+
+```php Product Page Hooks
+/**
+ * Add custom content to product page
+ */
+
+// Add delivery information before add to cart
+add_action( 'woocommerce_before_add_to_cart_form', 'mytheme_delivery_info' );
+function mytheme_delivery_info() {
+    echo '<div class="delivery-info">';
+    echo '<p>Free delivery on orders over $50</p>';
+    echo '</div>';
+}
+
+// Add trust badges after price
+add_action( 'woocommerce_single_product_summary', 'mytheme_trust_badges', 11 );
+function mytheme_trust_badges() {
+    echo '<div class="trust-badges">';
+    echo '<img src="' . get_stylesheet_directory_uri() . '/assets/images/secure-checkout.png" alt="Secure Checkout">';
+    echo '</div>';
+}
+
+// Remove product meta (SKU, categories, tags)
+remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_meta', 40 );
+
+// Reposition price after product title
+remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_price', 10 );
+add_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_price', 6 );
+```
+
+```php Shop Loop Hooks
+/**
+ * Customize product loops/archives
+ */
+
+// Add custom content before shop loop
+add_action( 'woocommerce_before_shop_loop', 'mytheme_shop_notice', 5 );
+function mytheme_shop_notice() {
+    if ( is_shop() ) {
+        echo '<div class="shop-notice">New arrivals every week!</div>';
+    }
+}
+
+// Change products per page
+add_filter( 'loop_shop_per_page', 'mytheme_products_per_page', 20 );
+function mytheme_products_per_page( $cols ) {
+    return 12;
+}
+
+// Change product columns
+add_filter( 'loop_shop_columns', 'mytheme_loop_columns' );
+function mytheme_loop_columns() {
+    return 4;
+}
+
+// Remove sale badge
+remove_action( 'woocommerce_before_shop_loop_item_title', 'woocommerce_show_product_loop_sale_flash', 10 );
+```
+
+```php Cart & Checkout Hooks
+/**
+ * Cart and checkout customizations
+ */
+
+// Add custom message to cart
+add_action( 'woocommerce_before_cart', 'mytheme_cart_message' );
+function mytheme_cart_message() {
+    echo '<div class="cart-message">';
+    echo '<p>Add $' . ( 50 - WC()->cart->get_subtotal() ) . ' more for free shipping!</p>';
+    echo '</div>';
+}
+
+// Modify checkout field
+add_filter( 'woocommerce_checkout_fields', 'mytheme_custom_checkout_fields' );
+function mytheme_custom_checkout_fields( $fields ) {
+    $fields['billing']['billing_phone']['placeholder'] = 'Your phone number';
+    $fields['billing']['billing_phone']['priority'] = 25;
+    return $fields;
+}
+
+// Add custom checkout content
+add_action( 'woocommerce_after_checkout_billing_form', 'mytheme_checkout_notice' );
+function mytheme_checkout_notice() {
+    echo '<div class="checkout-notice">All orders ship within 24 hours</div>';
+}
+```
+
+```php Email Hooks
+/**
+ * Email customizations
+ */
+
+// Add custom content to emails
+add_action( 'woocommerce_email_before_order_table', 'mytheme_email_custom_content', 10, 4 );
+function mytheme_email_custom_content( $order, $sent_to_admin, $plain_text, $email ) {
+    if ( ! $sent_to_admin ) {
+        echo '<p>Thank you for your order! We appreciate your business.</p>';
+    }
+}
+
+// Modify email subject
+add_filter( 'woocommerce_email_subject_customer_processing_order', 'mytheme_custom_email_subject', 10, 2 );
+function mytheme_custom_email_subject( $subject, $order ) {
+    return sprintf( 'Your Order #%s is Being Prepared', $order->get_order_number() );
+}
+```
+
+</CodeGroup>
+
+### Removing Default Hooks
+
+Remove WooCommerce's default functionality:
+
+```php
+/**
+ * Remove WooCommerce default actions
+ */
+
+// Remove breadcrumbs
+remove_action( 'woocommerce_before_main_content', 'woocommerce_breadcrumb', 20 );
+
+// Remove product rating
+remove_action( 'woocommerce_single_product_summary', 'woocommerce_template_single_rating', 10 );
+
+// Remove related products
+remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_related_products', 20 );
+
+// Remove upsells
+remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_upsell_display', 15 );
+
+// Remove product tabs
+remove_action( 'woocommerce_after_single_product_summary', 'woocommerce_output_product_data_tabs', 10 );
+```
+
+<Note>
+Always use the same priority when removing an action that was used when adding it. Check WooCommerce template files for default priorities.
+</Note>
+
+## Enqueuing Custom Assets
+
+Add custom CSS and JavaScript files properly:
+
+```php
+/**
+ * Enqueue child theme styles and scripts
+ */
+function mytheme_enqueue_assets() {
+    // Enqueue parent theme styles (if needed)
+    wp_enqueue_style( 'parent-style', 
+        get_template_directory_uri() . '/style.css' 
+    );
+    
+    // Enqueue child theme styles
+    wp_enqueue_style( 'child-style',
+        get_stylesheet_directory_uri() . '/style.css',
+        array( 'parent-style' ),
+        wp_get_theme()->get('Version')
+    );
+    
+    // Enqueue custom CSS
+    wp_enqueue_style( 'custom-woocommerce',
+        get_stylesheet_directory_uri() . '/assets/css/custom.css',
+        array( 'woocommerce-general' ),
+        '1.0.0'
+    );
+    
+    // Enqueue custom JavaScript
+    wp_enqueue_script( 'custom-woocommerce-js',
+        get_stylesheet_directory_uri() . '/assets/js/custom.js',
+        array( 'jquery', 'wc-cart-fragments' ),
+        '1.0.0',
+        true
+    );
+    
+    // Localize script with AJAX URL
+    wp_localize_script( 'custom-woocommerce-js', 'mytheme_vars', array(
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+        'nonce'    => wp_create_nonce( 'mytheme_nonce' ),
+    ) );
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_enqueue_assets' );
+
+/**
+ * Enqueue custom scripts only on WooCommerce pages
+ */
+function mytheme_woocommerce_scripts() {
+    if ( is_woocommerce() || is_cart() || is_checkout() ) {
+        wp_enqueue_script( 'mytheme-woocommerce',
+            get_stylesheet_directory_uri() . '/assets/js/woocommerce.js',
+            array( 'jquery' ),
+            '1.0.0',
+            true
+        );
+    }
+}
+add_action( 'wp_enqueue_scripts', 'mytheme_woocommerce_scripts' );
+```
+
+## Template Overrides in Child Themes
+
+Override WooCommerce templates by copying them to child theme:
+
+```
+wp-content/themes/storefront-child/woocommerce/
+├── single-product.php
+├── archive-product.php
+├── cart/
+│   └── cart.php
+└── single-product/
+    ├── title.php
+    └── price.php
+```
+
+### Best Practices for Template Overrides
+
+<Steps>
+  <Step title="Copy Complete Template">
+    Always copy the entire template file, never partial code.
+  </Step>
+  
+  <Step title="Document Version">
+    Add a comment noting the WooCommerce version you copied from:
+    
+    ```php
+    /**
+     * Overridden template from WooCommerce 8.5.0
+     * @version 3.6.0
+     */
+    ```
+  </Step>
+  
+  <Step title="Preserve Hooks">
+    Never remove `do_action()` or `apply_filters()` calls. Plugins depend on these hooks.
+  </Step>
+  
+  <Step title="Monitor Updates">
+    Check **WooCommerce → Status → System Status** for outdated template warnings.
+  </Step>
+</Steps>
+
+## Advanced Customization Techniques
+
+### Adding Custom Product Fields
+
+```php
+/**
+ * Add custom product field to admin
+ */
+add_action( 'woocommerce_product_options_general_product_data', 'mytheme_custom_field' );
+function mytheme_custom_field() {
+    woocommerce_wp_text_input( array(
+        'id'          => '_custom_field',
+        'label'       => 'Custom Field',
+        'desc_tip'    => 'true',
+        'description' => 'Enter custom information here',
+    ) );
+}
+
+/**
+ * Save custom product field
+ */
+add_action( 'woocommerce_process_product_meta', 'mytheme_save_custom_field' );
+function mytheme_save_custom_field( $post_id ) {
+    $custom_field = isset( $_POST['_custom_field'] ) ? sanitize_text_field( $_POST['_custom_field'] ) : '';
+    update_post_meta( $post_id, '_custom_field', $custom_field );
+}
+
+/**
+ * Display custom field on product page
+ */
+add_action( 'woocommerce_single_product_summary', 'mytheme_display_custom_field', 25 );
+function mytheme_display_custom_field() {
+    global $product;
+    $custom_field = get_post_meta( $product->get_id(), '_custom_field', true );
+    
+    if ( $custom_field ) {
+        echo '<div class="custom-field">' . esc_html( $custom_field ) . '</div>';
+    }
+}
+```
+
+### Modifying Product Query
+
+```php
+/**
+ * Exclude specific products from shop page
+ */
+add_action( 'woocommerce_product_query', 'mytheme_exclude_products' );
+function mytheme_exclude_products( $q ) {
+    if ( is_shop() ) {
+        $q->set( 'post__not_in', array( 123, 456, 789 ) );
+    }
+}
+
+/**
+ * Show only products on sale
+ */
+add_action( 'woocommerce_product_query', 'mytheme_show_only_sale_products' );
+function mytheme_show_only_sale_products( $q ) {
+    if ( isset( $_GET['on_sale'] ) && $_GET['on_sale'] === '1' ) {
+        $q->set( 'post__in', array_merge( array( 0 ), wc_get_product_ids_on_sale() ) );
+    }
+}
+```
+
+### Custom Cart Item Data
+
+```php
+/**
+ * Add custom data to cart item
+ */
+add_filter( 'woocommerce_add_cart_item_data', 'mytheme_add_cart_item_data', 10, 2 );
+function mytheme_add_cart_item_data( $cart_item_data, $product_id ) {
+    if ( isset( $_POST['custom_option'] ) ) {
+        $cart_item_data['custom_option'] = sanitize_text_field( $_POST['custom_option'] );
+    }
+    return $cart_item_data;
+}
+
+/**
+ * Display custom data in cart
+ */
+add_filter( 'woocommerce_get_item_data', 'mytheme_display_cart_item_data', 10, 2 );
+function mytheme_display_cart_item_data( $item_data, $cart_item ) {
+    if ( isset( $cart_item['custom_option'] ) ) {
+        $item_data[] = array(
+            'name'  => 'Custom Option',
+            'value' => $cart_item['custom_option'],
+        );
+    }
+    return $item_data;
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Always Use Child Themes" icon="code-branch">
+    Never modify parent themes or plugin files directly. Use child themes for all customizations.
+  </Card>
+  
+  <Card title="Prefer Hooks Over Templates" icon="link">
+    Use hooks whenever possible. They're more maintainable than template overrides.
+  </Card>
+  
+  <Card title="Sanitize and Validate" icon="shield-check">
+    Always sanitize user input and validate data before saving or displaying.
+  </Card>
+  
+  <Card title="Test After Updates" icon="flask">
+    Test all customizations after WooCommerce, WordPress, or theme updates.
+  </Card>
+  
+  <Card title="Document Your Code" icon="file-lines">
+    Add clear comments explaining what customizations do and why they exist.
+  </Card>
+  
+  <Card title="Version Control" icon="code-commit">
+    Use Git or similar version control for all theme customizations.
+  </Card>
+  
+  <Card title="Monitor Template Versions" icon="clock">
+    Regularly check System Status for outdated template warnings.
+  </Card>
+  
+  <Card title="Backup Before Changes" icon="database">
+    Always backup your site before making significant customizations.
+  </Card>
+</CardGroup>
+
+## Debugging and Testing
+
+### Enable Debugging
+
+Add to `wp-config.php` for development:
+
+```php
+define( 'WP_DEBUG', true );
+define( 'WP_DEBUG_LOG', true );
+define( 'WP_DEBUG_DISPLAY', false );
+define( 'SCRIPT_DEBUG', true );
+```
+
+### Template Debugging
+
+Identify which template is loading:
+
+```php
+/**
+ * Show template file path in HTML comments
+ */
+add_action( 'woocommerce_before_template_part', 'mytheme_template_debug_start', 10, 4 );
+function mytheme_template_debug_start( $template_name, $template_path, $located, $args ) {
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+        echo "\n<!-- Template: " . esc_html( $template_name ) . " -->\n";
+    }
+}
+```
+
+### Testing Checklist
+
+<Steps>
+  <Step title="Test All Page Types">
+    Verify customizations on shop, product, cart, checkout, and account pages.
+  </Step>
+  
+  <Step title="Test Responsive Design">
+    Check mobile, tablet, and desktop views for all customizations.
+  </Step>
+  
+  <Step title="Test Product Types">
+    Ensure customizations work with simple, variable, grouped, and external products.
+  </Step>
+  
+  <Step title="Cross-Browser Testing">
+    Test in Chrome, Firefox, Safari, and Edge browsers.
+  </Step>
+  
+  <Step title="Performance Testing">
+    Measure page load times before and after customizations.
+  </Step>
+</Steps>
+
+## Common Pitfalls to Avoid
+
+<Warning>
+**Never modify core WooCommerce files.** Updates will overwrite your changes. Always use hooks or template overrides.
+</Warning>
+
+<Warning>
+**Don't remove template hooks.** Plugins rely on these hooks. Removing them breaks extensibility.
+</Warning>
+
+<Warning>
+**Avoid using `!important` in CSS.** It creates specificity issues. Use more specific selectors instead.
+</Warning>
+
+<Warning>
+**Don't override `functions.php` completely.** Child theme `functions.php` should only contain additions, not parent theme content.
+</Warning>
+
+## Resources and References
+
+- [WooCommerce Template Structure](https://github.com/woocommerce/woocommerce/tree/trunk/plugins/woocommerce/templates)
+- [WooCommerce Action Reference](https://woocommerce.com/documentation/plugins/woocommerce/woocommerce-codex/action-reference/)
+- [WooCommerce Filter Reference](https://woocommerce.com/documentation/plugins/woocommerce/woocommerce-codex/filter-reference/)
+- [WordPress Child Themes](https://developer.wordpress.org/themes/advanced-topics/child-themes/)
+- [WooCommerce Theme Testing Checklist](https://developer.files.wordpress.com/2017/12/woocommerce-theme-testing-checklist.pdf)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Classic Theme Development" icon="php" href="/themes/classic-themes">
+    Deep dive into PHP-based theme development
+  </Card>
+  
+  <Card title="Block Theme Development" icon="cube" href="/themes/block-themes">
+    Explore modern FSE and block theme architecture
+  </Card>
+</CardGroup>
