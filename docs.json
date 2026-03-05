@@ -113,6 +113,14 @@
               "api/php/shipping-method-api",
               "api/php/payment-token-api"
             ]
+          },
+          {
+            "group": "Core Classes",
+            "pages": [
+              "api/core-classes/wc-product",
+              "api/core-classes/wc-order",
+              "api/core-classes/wc-customer"
+            ]
           }
         ]
       },

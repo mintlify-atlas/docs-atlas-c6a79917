@@ -1,0 +1,464 @@
+---
+title: "WC_Product Class"
+description: "Complete reference for the WC_Product class and product management."
+---
+
+## Overview
+
+The `WC_Product` class is the foundation for all product types in WooCommerce. It provides methods to get and set product data, manage inventory, handle pricing, and more.
+
+<Note>
+Always use `wc_get_product()` to instantiate products rather than creating `WC_Product` objects directly.
+</Note>
+
+## Getting a Product
+
+```php
+// Get product by ID
+$product = wc_get_product( 123 );
+
+// Check if product exists
+if ( ! $product ) {
+    return;
+}
+
+// Get product type
+$type = $product->get_type(); // 'simple', 'variable', 'grouped', etc.
+```
+
+## Product Data Structure
+
+The `WC_Product` class stores product data in a protected `$data` array:
+
+### Basic Information
+
+<ParamField path="name" type="string">
+  Product name/title
+</ParamField>
+
+<ParamField path="slug" type="string">
+  Product URL slug
+</ParamField>
+
+<ParamField path="status" type="string">
+  Product status: `publish`, `draft`, `pending`, `private`
+</ParamField>
+
+<ParamField path="featured" type="boolean">
+  Whether product is featured
+</ParamField>
+
+<ParamField path="catalog_visibility" type="string">
+  Catalog visibility: `visible`, `catalog`, `search`, `hidden`
+</ParamField>
+
+<ParamField path="description" type="string">
+  Full product description (HTML allowed)
+</ParamField>
+
+<ParamField path="short_description" type="string">
+  Short product description
+</ParamField>
+
+<ParamField path="sku" type="string">
+  Stock keeping unit (unique identifier)
+</ParamField>
+
+### Pricing
+
+<ParamField path="price" type="string">
+  Active price (regular or sale price)
+</ParamField>
+
+<ParamField path="regular_price" type="string">
+  Regular price
+</ParamField>
+
+<ParamField path="sale_price" type="string">
+  Sale price (if on sale)
+</ParamField>
+
+<ParamField path="date_on_sale_from" type="WC_DateTime|null">
+  Sale start date
+</ParamField>
+
+<ParamField path="date_on_sale_to" type="WC_DateTime|null">
+  Sale end date
+</ParamField>
+
+### Inventory
+
+<ParamField path="manage_stock" type="boolean">
+  Whether stock is managed at product level
+</ParamField>
+
+<ParamField path="stock_quantity" type="int|null">
+  Current stock quantity
+</ParamField>
+
+<ParamField path="stock_status" type="string">
+  Stock status: `instock`, `outofstock`, `onbackorder`
+</ParamField>
+
+<ParamField path="backorders" type="string">
+  Backorder setting: `no`, `notify`, `yes`
+</ParamField>
+
+<ParamField path="sold_individually" type="boolean">
+  Whether only one can be purchased per order
+</ParamField>
+
+### Physical Properties
+
+<ParamField path="weight" type="string">
+  Product weight
+</ParamField>
+
+<ParamField path="length" type="string">
+  Product length
+</ParamField>
+
+<ParamField path="width" type="string">
+  Product width
+</ParamField>
+
+<ParamField path="height" type="string">
+  Product height
+</ParamField>
+
+<ParamField path="virtual" type="boolean">
+  Whether product is virtual (no shipping)
+</ParamField>
+
+<ParamField path="downloadable" type="boolean">
+  Whether product is downloadable
+</ParamField>
+
+## Common Methods
+
+### Getting Product Data
+
+```php
+$product = wc_get_product( 123 );
+
+// Basic info
+$name = $product->get_name();
+$sku = $product->get_sku();
+$description = $product->get_description();
+$short_desc = $product->get_short_description();
+
+// Pricing
+$price = $product->get_price(); // Active price
+$regular_price = $product->get_regular_price();
+$sale_price = $product->get_sale_price();
+$is_on_sale = $product->is_on_sale();
+
+// Inventory
+$stock = $product->get_stock_quantity();
+$in_stock = $product->is_in_stock();
+$manage_stock = $product->get_manage_stock();
+$stock_status = $product->get_stock_status();
+
+// Images
+$image_id = $product->get_image_id();
+$gallery_ids = $product->get_gallery_image_ids();
+$image_url = wp_get_attachment_url( $image_id );
+
+// Categories and tags
+$category_ids = $product->get_category_ids();
+$tag_ids = $product->get_tag_ids();
+
+// Dates
+$date_created = $product->get_date_created(); // WC_DateTime object
+$date_modified = $product->get_date_modified();
+```
+
+### Setting Product Data
+
+```php
+$product = wc_get_product( 123 );
+
+// Set basic info
+$product->set_name( 'New Product Name' );
+$product->set_description( 'Full product description' );
+$product->set_short_description( 'Short description' );
+
+// Set pricing
+$product->set_regular_price( '29.99' );
+$product->set_sale_price( '19.99' );
+
+// Set inventory
+$product->set_stock_quantity( 100 );
+$product->set_manage_stock( true );
+$product->set_stock_status( 'instock' );
+
+// Set attributes
+$product->set_sku( 'PROD-123' );
+$product->set_weight( '1.5' );
+$product->set_virtual( false );
+
+// Save changes
+$product->save();
+```
+
+<Warning>
+Always call `$product->save()` after making changes to persist them to the database.
+</Warning>
+
+### Creating a New Product
+
+```php
+// Create a new simple product
+$product = new WC_Product_Simple();
+
+$product->set_name( 'My New Product' );
+$product->set_status( 'publish' );
+$product->set_catalog_visibility( 'visible' );
+$product->set_description( 'This is the full description' );
+$product->set_short_description( 'This is the short description' );
+$product->set_sku( 'PRODUCT-SKU' );
+$product->set_regular_price( '29.99' );
+$product->set_manage_stock( true );
+$product->set_stock_quantity( 100 );
+$product->set_stock_status( 'instock' );
+
+// Save and get ID
+$product_id = $product->save();
+```
+
+## Product Types
+
+WooCommerce supports multiple product types:
+
+### Simple Product
+
+```php
+$product = new WC_Product_Simple();
+$product->set_name( 'Simple Product' );
+$product->set_regular_price( '19.99' );
+$product->save();
+```
+
+### Variable Product
+
+```php
+$product = new WC_Product_Variable();
+$product->set_name( 'Variable Product' );
+$product->save();
+
+// Add variations
+$variation = new WC_Product_Variation();
+$variation->set_parent_id( $product->get_id() );
+$variation->set_attributes( array( 'size' => 'large' ) );
+$variation->set_regular_price( '29.99' );
+$variation->save();
+```
+
+### Grouped Product
+
+```php
+$product = new WC_Product_Grouped();
+$product->set_name( 'Grouped Product' );
+$product->set_children( array( 123, 456, 789 ) ); // Product IDs
+$product->save();
+```
+
+### External Product
+
+```php
+$product = new WC_Product_External();
+$product->set_name( 'External Product' );
+$product->set_product_url( 'https://example.com/product' );
+$product->set_button_text( 'Buy Now' );
+$product->save();
+```
+
+## Working with Metadata
+
+```php
+$product = wc_get_product( 123 );
+
+// Get meta
+$custom_value = $product->get_meta( 'custom_field' );
+
+// Set meta
+$product->update_meta_data( 'custom_field', 'custom_value' );
+$product->save();
+
+// Delete meta
+$product->delete_meta_data( 'custom_field' );
+$product->save();
+
+// Get all meta
+$all_meta = $product->get_meta_data();
+```
+
+## Stock Management
+
+### Reducing Stock
+
+```php
+$product = wc_get_product( 123 );
+
+// Reduce stock by quantity
+$new_stock = wc_update_product_stock( $product, 5, 'decrease' );
+
+// Or use product method
+$product->set_stock_quantity( $product->get_stock_quantity() - 5 );
+$product->save();
+```
+
+### Increasing Stock
+
+```php
+$product = wc_get_product( 123 );
+
+// Increase stock
+$new_stock = wc_update_product_stock( $product, 10, 'increase' );
+```
+
+### Stock Status
+
+```php
+$product = wc_get_product( 123 );
+
+// Check stock
+if ( $product->is_in_stock() ) {
+    echo 'In stock';
+}
+
+if ( $product->managing_stock() ) {
+    echo 'Stock managed: ' . $product->get_stock_quantity();
+}
+
+// Set out of stock
+$product->set_stock_status( 'outofstock' );
+$product->save();
+```
+
+## Product Images
+
+```php
+$product = wc_get_product( 123 );
+
+// Get main image
+$image_id = $product->get_image_id();
+$image_url = wp_get_attachment_url( $image_id );
+$image_html = $product->get_image(); // HTML img tag
+
+// Set main image
+$product->set_image_id( $attachment_id );
+
+// Get gallery images
+$gallery_ids = $product->get_gallery_image_ids();
+
+// Set gallery images
+$product->set_gallery_image_ids( array( 456, 789, 101 ) );
+
+$product->save();
+```
+
+## Product Attributes
+
+```php
+$product = wc_get_product( 123 );
+
+// Get attributes
+$attributes = $product->get_attributes();
+
+foreach ( $attributes as $attribute ) {
+    $name = $attribute->get_name();
+    $options = $attribute->get_options();
+    $visible = $attribute->get_visible();
+}
+
+// Set attributes
+$attribute = new WC_Product_Attribute();
+$attribute->set_name( 'pa_color' );
+$attribute->set_options( array( 'red', 'blue', 'green' ) );
+$attribute->set_visible( true );
+$attribute->set_variation( true );
+
+$product->set_attributes( array( $attribute ) );
+$product->save();
+```
+
+## Helper Functions
+
+### Get Product by SKU
+
+```php
+$product_id = wc_get_product_id_by_sku( 'PRODUCT-SKU' );
+$product = wc_get_product( $product_id );
+```
+
+### Check if Product Exists
+
+```php
+$product = wc_get_product( 123 );
+if ( $product && $product->get_id() > 0 ) {
+    // Product exists
+}
+```
+
+### Delete Product
+
+```php
+$product = wc_get_product( 123 );
+$product->delete( true ); // true = force delete, false = move to trash
+```
+
+## Hooks
+
+### Product Save Hooks
+
+```php
+// Before product is saved
+add_action( 'woocommerce_before_product_object_save', function( $product, $data_store ) {
+    // Modify product before save
+}, 10, 2 );
+
+// After product is saved
+add_action( 'woocommerce_update_product', function( $product_id ) {
+    $product = wc_get_product( $product_id );
+    // Do something after product update
+}, 10, 1 );
+```
+
+### Product Data Filters
+
+```php
+// Filter product price
+add_filter( 'woocommerce_product_get_price', function( $price, $product ) {
+    // Modify price
+    return $price * 1.1; // Add 10%
+}, 10, 2 );
+
+// Filter product name
+add_filter( 'woocommerce_product_get_name', function( $name, $product ) {
+    return '[SALE] ' . $name;
+}, 10, 2 );
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use wc_get_product()" icon="check">
+    Always use `wc_get_product()` to get products instead of directly instantiating.
+  </Card>
+  <Card title="Save Changes" icon="floppy-disk">
+    Always call `$product->save()` after modifying product data.
+  </Card>
+  <Card title="Check Product Exists" icon="magnifying-glass">
+    Verify `$product` is not false before using it.
+  </Card>
+  <Card title="Use Setters/Getters" icon="lock">
+    Use getter/setter methods instead of accessing `$product->data` directly.
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [WooCommerce Code Reference](https://developer.wordpress.org/reference/classes/wc_product/)
+- [Product Data Store](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/data-stores/class-wc-product-data-store-cpt.php)
+- [Abstract Product Class](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/abstracts/abstract-wc-product.php)

@@ -1,0 +1,477 @@
+---
+title: "WC_Customer Class"
+description: "Complete reference for the WC_Customer class and customer management."
+---
+
+## Overview
+
+The `WC_Customer` class represents a customer in WooCommerce. It manages customer data including billing/shipping addresses, user account linkage, and session data for guest customers.
+
+<Note>
+The `WC_Customer` class works with both registered users and guest customers. For registered users, data is stored in the database. For guests, data is stored in the session.
+</Note>
+
+## Getting a Customer
+
+```php
+// Get current customer (session or user)
+$customer = WC()->customer;
+
+// Get customer by user ID
+$customer = new WC_Customer( 123 );
+
+// Check if customer exists
+if ( $customer && $customer->get_id() > 0 ) {
+    // Customer exists
+}
+```
+
+## Customer Data Structure
+
+### Basic Information
+
+<ParamField path="id" type="int">
+  Customer ID (WordPress user ID)
+</ParamField>
+
+<ParamField path="email" type="string">
+  Customer email address
+</ParamField>
+
+<ParamField path="first_name" type="string">
+  Customer first name
+</ParamField>
+
+<ParamField path="last_name" type="string">
+  Customer last name
+</ParamField>
+
+<ParamField path="username" type="string">
+  Customer username
+</ParamField>
+
+<ParamField path="date_created" type="WC_DateTime">
+  Date customer account was created
+</ParamField>
+
+<ParamField path="date_modified" type="WC_DateTime">
+  Date customer data was last modified
+</ParamField>
+
+### Billing Address
+
+<ParamField path="billing" type="array">
+  Billing address fields:
+  - `first_name`
+  - `last_name`
+  - `company`
+  - `address_1`
+  - `address_2`
+  - `city`
+  - `state`
+  - `postcode`
+  - `country`
+  - `email`
+  - `phone`
+</ParamField>
+
+### Shipping Address
+
+<ParamField path="shipping" type="array">
+  Shipping address fields:
+  - `first_name`
+  - `last_name`
+  - `company`
+  - `address_1`
+  - `address_2`
+  - `city`
+  - `state`
+  - `postcode`
+  - `country`
+</ParamField>
+
+## Common Methods
+
+### Getting Customer Data
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Basic info
+$customer_id = $customer->get_id();
+$email = $customer->get_email();
+$first_name = $customer->get_first_name();
+$last_name = $customer->get_last_name();
+$display_name = $customer->get_display_name();
+$username = $customer->get_username();
+
+// Check if guest
+$is_guest = ! $customer->get_id();
+
+// Billing address
+$billing_first_name = $customer->get_billing_first_name();
+$billing_last_name = $customer->get_billing_last_name();
+$billing_email = $customer->get_billing_email();
+$billing_phone = $customer->get_billing_phone();
+$billing_country = $customer->get_billing_country();
+$billing_postcode = $customer->get_billing_postcode();
+$billing_city = $customer->get_billing_city();
+$billing_address_1 = $customer->get_billing_address_1();
+$billing_address_2 = $customer->get_billing_address_2();
+
+// Shipping address
+$shipping_first_name = $customer->get_shipping_first_name();
+$shipping_last_name = $customer->get_shipping_last_name();
+$shipping_country = $customer->get_shipping_country();
+$shipping_postcode = $customer->get_shipping_postcode();
+$shipping_city = $customer->get_shipping_city();
+$shipping_address_1 = $customer->get_shipping_address_1();
+$shipping_address_2 = $customer->get_shipping_address_2();
+
+// Dates
+$date_created = $customer->get_date_created(); // WC_DateTime
+$date_modified = $customer->get_date_modified();
+```
+
+### Setting Customer Data
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Set basic info
+$customer->set_email( 'customer@example.com' );
+$customer->set_first_name( 'John' );
+$customer->set_last_name( 'Doe' );
+
+// Set billing address
+$customer->set_billing_first_name( 'John' );
+$customer->set_billing_last_name( 'Doe' );
+$customer->set_billing_company( 'Acme Inc' );
+$customer->set_billing_address_1( '123 Main St' );
+$customer->set_billing_address_2( 'Apt 4B' );
+$customer->set_billing_city( 'New York' );
+$customer->set_billing_state( 'NY' );
+$customer->set_billing_postcode( '10001' );
+$customer->set_billing_country( 'US' );
+$customer->set_billing_email( 'john@example.com' );
+$customer->set_billing_phone( '555-1234' );
+
+// Set shipping address
+$customer->set_shipping_first_name( 'John' );
+$customer->set_shipping_last_name( 'Doe' );
+$customer->set_shipping_company( 'Acme Inc' );
+$customer->set_shipping_address_1( '123 Main St' );
+$customer->set_shipping_city( 'New York' );
+$customer->set_shipping_state( 'NY' );
+$customer->set_shipping_postcode( '10001' );
+$customer->set_shipping_country( 'US' );
+
+// Save changes
+$customer->save();
+```
+
+<Warning>
+Always call `$customer->save()` after making changes to persist them.
+</Warning>
+
+### Creating a New Customer
+
+```php
+// Create new customer
+$customer = new WC_Customer();
+
+$customer->set_email( 'newcustomer@example.com' );
+$customer->set_first_name( 'Jane' );
+$customer->set_last_name( 'Smith' );
+$customer->set_username( 'janesmith' );
+
+// Set billing address
+$customer->set_billing_first_name( 'Jane' );
+$customer->set_billing_last_name( 'Smith' );
+$customer->set_billing_email( 'jane@example.com' );
+$customer->set_billing_phone( '555-5678' );
+$customer->set_billing_country( 'US' );
+$customer->set_billing_postcode( '90210' );
+$customer->set_billing_city( 'Beverly Hills' );
+$customer->set_billing_address_1( '456 Rodeo Drive' );
+
+// Save to create user account
+$customer_id = $customer->save();
+
+// Set password
+wp_set_password( 'secure_password_123', $customer_id );
+```
+
+## Working with Addresses
+
+### Getting Full Addresses
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Get billing address as array
+$billing = array(
+    'first_name' => $customer->get_billing_first_name(),
+    'last_name'  => $customer->get_billing_last_name(),
+    'company'    => $customer->get_billing_company(),
+    'address_1'  => $customer->get_billing_address_1(),
+    'address_2'  => $customer->get_billing_address_2(),
+    'city'       => $customer->get_billing_city(),
+    'state'      => $customer->get_billing_state(),
+    'postcode'   => $customer->get_billing_postcode(),
+    'country'    => $customer->get_billing_country(),
+    'email'      => $customer->get_billing_email(),
+    'phone'      => $customer->get_billing_phone(),
+);
+
+// Get shipping address as array
+$shipping = array(
+    'first_name' => $customer->get_shipping_first_name(),
+    'last_name'  => $customer->get_shipping_last_name(),
+    'company'    => $customer->get_shipping_company(),
+    'address_1'  => $customer->get_shipping_address_1(),
+    'address_2'  => $customer->get_shipping_address_2(),
+    'city'       => $customer->get_shipping_city(),
+    'state'      => $customer->get_shipping_state(),
+    'postcode'   => $customer->get_shipping_postcode(),
+    'country'    => $customer->get_shipping_country(),
+);
+```
+
+### Formatted Addresses
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Get formatted billing address (HTML)
+$formatted_billing = $customer->get_formatted_billing_address();
+
+// Get formatted shipping address (HTML)
+$formatted_shipping = $customer->get_formatted_shipping_address();
+```
+
+## Customer Orders
+
+### Getting Customer Orders
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Get all orders
+$orders = wc_get_orders( array(
+    'customer_id' => $customer->get_id(),
+    'limit' => -1,
+) );
+
+// Get order count
+$order_count = wc_get_customer_order_count( $customer->get_id() );
+
+// Get total spent
+$total_spent = wc_get_customer_total_spent( $customer->get_id() );
+
+// Get last order
+$last_order = wc_get_customer_last_order( $customer->get_id() );
+```
+
+### Customer Spending Statistics
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Get total spent
+$total_spent = $customer->get_total_spent();
+
+// Get order count
+$order_count = $customer->get_order_count();
+
+// Check if customer has purchased
+$has_purchased = wc_customer_bought_product(
+    $customer->get_email(),
+    $customer->get_id(),
+    $product_id
+);
+```
+
+## Customer Metadata
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Get meta
+$loyalty_points = $customer->get_meta( 'loyalty_points' );
+
+// Set meta
+$customer->update_meta_data( 'loyalty_points', 150 );
+$customer->save();
+
+// Delete meta
+$customer->delete_meta_data( 'loyalty_points' );
+$customer->save();
+
+// Get all meta
+$meta_data = $customer->get_meta_data();
+```
+
+## Session Management (Guest Customers)
+
+### Current Session Customer
+
+```php
+// Get current customer from session
+$customer = WC()->customer;
+
+// Set session data for guest
+if ( ! is_user_logged_in() ) {
+    $customer->set_billing_email( 'guest@example.com' );
+    $customer->set_billing_country( 'US' );
+    $customer->save(); // Saves to session
+}
+
+// Session data persists across page loads
+```
+
+### Checking Guest vs Registered
+
+```php
+$customer = WC()->customer;
+
+if ( $customer->get_id() > 0 ) {
+    // Registered customer
+    echo 'Customer ID: ' . $customer->get_id();
+} else {
+    // Guest customer
+    echo 'Guest customer';
+}
+```
+
+## Customer Roles
+
+### Checking Customer Role
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Get user object
+$user = get_user_by( 'id', $customer->get_id() );
+
+// Check role
+if ( in_array( 'customer', $user->roles ) ) {
+    // Is a customer
+}
+
+if ( in_array( 'administrator', $user->roles ) ) {
+    // Is an admin
+}
+```
+
+### Adding Customer Role
+
+```php
+$customer_id = 123;
+$user = get_user_by( 'id', $customer_id );
+
+// Add customer role
+$user->add_role( 'customer' );
+
+// Remove role
+$user->remove_role( 'subscriber' );
+```
+
+## Downloadable Products
+
+### Customer Downloads
+
+```php
+$customer = new WC_Customer( 123 );
+
+// Get downloadable products
+$downloads = wc_get_customer_available_downloads( $customer->get_id() );
+
+foreach ( $downloads as $download ) {
+    echo $download['product_name'];
+    echo $download['download_url'];
+    echo $download['downloads_remaining'];
+}
+```
+
+## Helper Functions
+
+### Get Customer by Email
+
+```php
+$customer_id = wc_get_customer_id_by_email( 'customer@example.com' );
+
+if ( $customer_id ) {
+    $customer = new WC_Customer( $customer_id );
+}
+```
+
+### Check if Email Exists
+
+```php
+if ( email_exists( 'customer@example.com' ) ) {
+    // Email already registered
+}
+```
+
+### Delete Customer
+
+```php
+$customer = new WC_Customer( 123 );
+$customer->delete(); // Also deletes WordPress user
+```
+
+## Hooks
+
+### Customer Save Hooks
+
+```php
+// Before customer is saved
+add_action( 'woocommerce_before_customer_object_save', function( $customer, $data_store ) {
+    // Modify customer before save
+}, 10, 2 );
+
+// After customer is saved
+add_action( 'woocommerce_update_customer', function( $customer_id ) {
+    $customer = new WC_Customer( $customer_id );
+    // Do something after customer update
+}, 10, 1 );
+
+// After new customer is created
+add_action( 'woocommerce_created_customer', function( $customer_id, $new_customer_data, $password_generated ) {
+    $customer = new WC_Customer( $customer_id );
+    // Send welcome email, add to mailing list, etc.
+}, 10, 3 );
+```
+
+### Customer Data Filters
+
+```php
+// Filter customer display name
+add_filter( 'woocommerce_customer_get_display_name', function( $display_name, $customer ) {
+    return $customer->get_first_name() . ' ' . $customer->get_last_name();
+}, 10, 2 );
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use WC()->customer" icon="user">
+    For the current session customer, use `WC()->customer`.
+  </Card>
+  <Card title="Save Changes" icon="floppy-disk">
+    Always call `$customer->save()` after modifications.
+  </Card>
+  <Card title="Handle Guests" icon="user-secret">
+    Check `$customer->get_id() > 0` to distinguish registered vs guest.
+  </Card>
+  <Card title="Validate Email" icon="envelope">
+    Always validate and sanitize email addresses before setting.
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [WooCommerce Code Reference](https://developer.wordpress.org/reference/classes/wc_customer/)
+- [Customer CRUD](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/class-wc-customer.php)
+- [Session Handler](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/class-wc-session-handler.php)

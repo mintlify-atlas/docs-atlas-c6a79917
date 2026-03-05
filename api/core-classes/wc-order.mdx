@@ -1,0 +1,561 @@
+---
+title: "WC_Order Class"
+description: "Complete reference for the WC_Order class and order management."
+---
+
+## Overview
+
+The `WC_Order` class represents a customer order in WooCommerce. It provides methods to manage order data, items, totals, status, and customer information.
+
+<Note>
+Always use `wc_get_order()` to retrieve orders rather than creating `WC_Order` objects directly.
+</Note>
+
+## Getting an Order
+
+```php
+// Get order by ID
+$order = wc_get_order( 123 );
+
+// Check if order exists
+if ( ! $order ) {
+    return;
+}
+
+// Get order number (may differ from ID)
+$order_number = $order->get_order_number();
+
+// Get order key
+$order_key = $order->get_order_key();
+```
+
+## Order Data Structure
+
+The `WC_Order` class stores comprehensive order data:
+
+### Order Information
+
+<ParamField path="status" type="string">
+  Order status: `pending`, `processing`, `on-hold`, `completed`, `cancelled`, `refunded`, `failed`
+</ParamField>
+
+<ParamField path="currency" type="string">
+  Currency code (e.g., `USD`, `EUR`)
+</ParamField>
+
+<ParamField path="date_created" type="WC_DateTime">
+  Date order was created
+</ParamField>
+
+<ParamField path="date_modified" type="WC_DateTime">
+  Date order was last modified
+</ParamField>
+
+<ParamField path="date_completed" type="WC_DateTime|null">
+  Date order was completed
+</ParamField>
+
+<ParamField path="date_paid" type="WC_DateTime|null">
+  Date order was paid
+</ParamField>
+
+### Customer Information
+
+<ParamField path="customer_id" type="int">
+  Customer user ID (0 for guests)
+</ParamField>
+
+<ParamField path="customer_ip_address" type="string">
+  Customer IP address
+</ParamField>
+
+<ParamField path="customer_user_agent" type="string">
+  Customer browser user agent
+</ParamField>
+
+<ParamField path="customer_note" type="string">
+  Customer-provided order notes
+</ParamField>
+
+### Billing Address
+
+<ParamField path="billing" type="array">
+  Billing address fields:
+  - `first_name`
+  - `last_name`
+  - `company`
+  - `address_1`
+  - `address_2`
+  - `city`
+  - `state`
+  - `postcode`
+  - `country`
+  - `email`
+  - `phone`
+</ParamField>
+
+### Shipping Address
+
+<ParamField path="shipping" type="array">
+  Shipping address fields (same structure as billing, minus email/phone)
+</ParamField>
+
+### Payment Information
+
+<ParamField path="payment_method" type="string">
+  Payment gateway ID
+</ParamField>
+
+<ParamField path="payment_method_title" type="string">
+  Payment method display name
+</ParamField>
+
+<ParamField path="transaction_id" type="string">
+  Payment transaction ID from gateway
+</ParamField>
+
+### Order Totals
+
+<ParamField path="total" type="string">
+  Order grand total
+</ParamField>
+
+<ParamField path="discount_total" type="string">
+  Total discount amount
+</ParamField>
+
+<ParamField path="discount_tax" type="string">
+  Tax on discounts
+</ParamField>
+
+<ParamField path="shipping_total" type="string">
+  Shipping cost
+</ParamField>
+
+<ParamField path="shipping_tax" type="string">
+  Tax on shipping
+</ParamField>
+
+<ParamField path="cart_tax" type="string">
+  Cart tax amount
+</ParamField>
+
+<ParamField path="total_tax" type="string">
+  Total tax amount
+</ParamField>
+
+## Common Methods
+
+### Getting Order Data
+
+```php
+$order = wc_get_order( 123 );
+
+// Basic info
+$order_id = $order->get_id();
+$order_number = $order->get_order_number();
+$status = $order->get_status();
+$total = $order->get_total();
+$currency = $order->get_currency();
+$payment_method = $order->get_payment_method();
+$payment_title = $order->get_payment_method_title();
+
+// Customer info
+$customer_id = $order->get_customer_id();
+$billing_email = $order->get_billing_email();
+$billing_phone = $order->get_billing_phone();
+$billing_first_name = $order->get_billing_first_name();
+$billing_last_name = $order->get_billing_last_name();
+
+// Addresses
+$billing_address = $order->get_address( 'billing' );
+$shipping_address = $order->get_address( 'shipping' );
+$formatted_billing = $order->get_formatted_billing_address();
+$formatted_shipping = $order->get_formatted_shipping_address();
+
+// Dates
+$date_created = $order->get_date_created(); // WC_DateTime
+$date_paid = $order->get_date_paid();
+$date_completed = $order->get_date_completed();
+```
+
+### Setting Order Data
+
+```php
+$order = wc_get_order( 123 );
+
+// Set customer info
+$order->set_customer_id( 456 );
+$order->set_billing_email( 'customer@example.com' );
+$order->set_billing_phone( '555-1234' );
+
+// Set billing address
+$order->set_billing_first_name( 'John' );
+$order->set_billing_last_name( 'Doe' );
+$order->set_billing_address_1( '123 Main St' );
+$order->set_billing_city( 'New York' );
+$order->set_billing_postcode( '10001' );
+$order->set_billing_country( 'US' );
+
+// Set payment info
+$order->set_payment_method( 'stripe' );
+$order->set_payment_method_title( 'Credit Card' );
+$order->set_transaction_id( 'txn_123456' );
+
+// Save changes
+$order->save();
+```
+
+<Warning>
+Always call `$order->save()` after making changes to persist them to the database.
+</Warning>
+
+### Creating a New Order
+
+```php
+// Create new order
+$order = wc_create_order();
+
+// Set customer
+$order->set_customer_id( 123 );
+
+// Add products
+$product = wc_get_product( 456 );
+$order->add_product( $product, 2 ); // 2 quantity
+
+// Set addresses
+$order->set_billing_first_name( 'John' );
+$order->set_billing_last_name( 'Doe' );
+$order->set_billing_email( 'john@example.com' );
+// ... set other address fields
+
+// Calculate totals
+$order->calculate_totals();
+
+// Set payment method
+$order->set_payment_method( 'cod' );
+
+// Save
+$order->save();
+
+// Update status
+$order->update_status( 'processing', 'Order created programmatically' );
+```
+
+## Order Status Management
+
+### Getting Order Status
+
+```php
+$order = wc_get_order( 123 );
+
+$status = $order->get_status(); // Returns without 'wc-' prefix
+$has_status = $order->has_status( 'completed' );
+$is_paid = $order->is_paid();
+$needs_payment = $order->needs_payment();
+$needs_processing = $order->needs_processing();
+```
+
+### Updating Order Status
+
+```php
+$order = wc_get_order( 123 );
+
+// Update status with note
+$order->update_status( 'completed', 'Order shipped and delivered.' );
+
+// Available statuses:
+// - pending
+// - processing
+// - on-hold
+// - completed
+// - cancelled
+// - refunded
+// - failed
+```
+
+### Payment Complete
+
+```php
+$order = wc_get_order( 123 );
+
+// Mark payment as complete
+$order->payment_complete( 'transaction_id_123' );
+
+// This will:
+// - Update order status to 'processing' or 'completed'
+// - Reduce stock
+// - Record payment date
+// - Trigger emails
+```
+
+## Working with Order Items
+
+### Getting Order Items
+
+```php
+$order = wc_get_order( 123 );
+
+// Get all items
+$items = $order->get_items();
+
+foreach ( $items as $item_id => $item ) {
+    $product_id = $item->get_product_id();
+    $product = $item->get_product();
+    $quantity = $item->get_quantity();
+    $subtotal = $item->get_subtotal();
+    $total = $item->get_total();
+    $tax = $item->get_total_tax();
+    
+    // Get item meta
+    $meta_data = $item->get_meta_data();
+}
+
+// Get specific item types
+$line_items = $order->get_items( 'line_item' );
+$shipping_items = $order->get_items( 'shipping' );
+$fee_items = $order->get_items( 'fee' );
+$coupon_items = $order->get_items( 'coupon' );
+$tax_items = $order->get_items( 'tax' );
+```
+
+### Adding Items
+
+```php
+$order = wc_get_order( 123 );
+
+// Add product
+$product = wc_get_product( 456 );
+$item_id = $order->add_product( $product, 2, array(
+    'subtotal' => 20,
+    'total' => 18, // After discount
+) );
+
+// Add shipping
+$shipping = new WC_Order_Item_Shipping();
+$shipping->set_method_title( 'Flat Rate' );
+$shipping->set_method_id( 'flat_rate:1' );
+$shipping->set_total( 10 );
+$order->add_item( $shipping );
+
+// Add fee
+$fee = new WC_Order_Item_Fee();
+$fee->set_name( 'Processing Fee' );
+$fee->set_amount( 5 );
+$fee->set_total( 5 );
+$order->add_item( $fee );
+
+// Add coupon
+$coupon = new WC_Order_Item_Coupon();
+$coupon->set_code( 'SAVE10' );
+$coupon->set_discount( 10 );
+$order->add_item( $coupon );
+
+// Recalculate totals
+$order->calculate_totals();
+$order->save();
+```
+
+### Removing Items
+
+```php
+$order = wc_get_order( 123 );
+
+// Remove specific item
+$order->remove_item( $item_id );
+
+// Remove all items of a type
+foreach ( $order->get_items( 'shipping' ) as $item_id => $item ) {
+    $order->remove_item( $item_id );
+}
+
+$order->calculate_totals();
+$order->save();
+```
+
+## Order Totals
+
+### Calculating Totals
+
+```php
+$order = wc_get_order( 123 );
+
+// Recalculate all totals
+$order->calculate_totals();
+
+// Calculate specific totals
+$order->calculate_shipping();
+$order->calculate_taxes();
+```
+
+### Getting Totals
+
+```php
+$order = wc_get_order( 123 );
+
+$subtotal = $order->get_subtotal();
+$discount = $order->get_discount_total();
+$shipping = $order->get_shipping_total();
+$tax = $order->get_total_tax();
+$total = $order->get_total();
+
+// Formatted totals
+$formatted_total = $order->get_formatted_order_total();
+```
+
+## Order Notes
+
+### Adding Notes
+
+```php
+$order = wc_get_order( 123 );
+
+// Add customer note (visible to customer)
+$order->add_order_note(
+    'Your order has been shipped!',
+    true, // $is_customer_note
+    false // $added_by_user
+);
+
+// Add private note (admin only)
+$order->add_order_note(
+    'Customer requested gift wrapping',
+    false,
+    true
+);
+```
+
+### Getting Notes
+
+```php
+$order = wc_get_order( 123 );
+
+// Get all notes
+$notes = wc_get_order_notes( array(
+    'order_id' => $order->get_id(),
+) );
+
+foreach ( $notes as $note ) {
+    echo $note->content;
+    echo $note->date_created;
+    echo $note->customer_note ? 'Customer' : 'Private';
+}
+
+// Get only customer notes
+$customer_notes = wc_get_order_notes( array(
+    'order_id' => $order->get_id(),
+    'type' => 'customer',
+) );
+```
+
+## Refunds
+
+### Creating a Refund
+
+```php
+$order = wc_get_order( 123 );
+
+// Create refund
+$refund = wc_create_refund( array(
+    'order_id' => $order->get_id(),
+    'amount' => 50.00,
+    'reason' => 'Customer returned item',
+    'line_items' => array(
+        $item_id => array(
+            'qty' => 1,
+            'refund_total' => 50.00,
+        ),
+    ),
+) );
+
+if ( is_wp_error( $refund ) ) {
+    // Handle error
+} else {
+    // Refund created successfully
+    $refund_id = $refund->get_id();
+}
+```
+
+### Getting Refunds
+
+```php
+$order = wc_get_order( 123 );
+
+$refunds = $order->get_refunds();
+$total_refunded = $order->get_total_refunded();
+```
+
+## Metadata
+
+```php
+$order = wc_get_order( 123 );
+
+// Get meta
+$tracking_number = $order->get_meta( 'tracking_number' );
+
+// Set meta
+$order->update_meta_data( 'tracking_number', '1Z999AA10123456784' );
+$order->save();
+
+// Delete meta
+$order->delete_meta_data( 'tracking_number' );
+$order->save();
+
+// Get all meta
+$meta_data = $order->get_meta_data();
+```
+
+## Hooks
+
+### Order Status Hooks
+
+```php
+// When order status changes
+add_action( 'woocommerce_order_status_changed', function( $order_id, $old_status, $new_status, $order ) {
+    // Do something when status changes
+}, 10, 4 );
+
+// When order is completed
+add_action( 'woocommerce_order_status_completed', function( $order_id ) {
+    $order = wc_get_order( $order_id );
+    // Send custom email, update external system, etc.
+}, 10, 1 );
+```
+
+### Order Save Hooks
+
+```php
+// Before order is saved
+add_action( 'woocommerce_before_order_object_save', function( $order, $data_store ) {
+    // Modify order before save
+}, 10, 2 );
+
+// After order is saved
+add_action( 'woocommerce_update_order', function( $order_id ) {
+    $order = wc_get_order( $order_id );
+    // Do something after order update
+}, 10, 1 );
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use wc_get_order()" icon="check">
+    Always use `wc_get_order()` instead of direct instantiation.
+  </Card>
+  <Card title="Save Changes" icon="floppy-disk">
+    Call `$order->save()` after modifications.
+  </Card>
+  <Card title="Recalculate Totals" icon="calculator">
+    Call `$order->calculate_totals()` after adding/removing items.
+  </Card>
+  <Card title="Use update_status()" icon="flag">
+    Use `update_status()` instead of setting status directly.
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- [WooCommerce Code Reference](https://developer.wordpress.org/reference/classes/wc_order/)
+- [Order CRUD](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/class-wc-order.php)
+- [Order Data Store](https://github.com/woocommerce/woocommerce/blob/trunk/plugins/woocommerce/includes/data-stores/class-wc-order-data-store-cpt.php)

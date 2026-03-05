@@ -1,80 +1,304 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quickstart Guide"
+description: "Get started with WooCommerce development in under 10 minutes."
 ---
 
-## Get started in three steps
+## Overview
 
-Get your documentation site running locally and make your first customization.
-
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+This quickstart will get you from zero to a working WooCommerce development environment with your first customization in under 10 minutes.
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+This guide assumes you have basic familiarity with Git, command line, and either PHP or JavaScript development.
 </Note>
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+<Steps>
+  <Step title="Node.js (via NVM)">
+    Install Node Version Manager to manage Node.js versions:
+    
+    ```bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+    ```
+  </Step>
+  
+  <Step title="PNPM">
+    Install PNPM package manager globally:
+    
+    ```bash
+    npm install -g pnpm
+    ```
+  </Step>
+  
+  <Step title="PHP 7.4+ and Composer">
+    Install PHP and Composer for your operating system:
+    
+    <Tabs>
+      <Tab title="Ubuntu/Debian">
+        ```bash
+        sudo apt update
+        sudo apt install php php-cli php-mbstring php-xml composer
+        ```
+      </Tab>
+      
+      <Tab title="macOS (Homebrew)">
+        ```bash
+        brew install php composer
+        ```
+      </Tab>
+    </Tabs>
+  </Step>
+</Steps>
+
+## Get Started in Three Steps
+
+### Step 1: Clone and Install
+
+Clone the WooCommerce repository and install dependencies:
+
+```bash
+# Clone the repository
+git clone https://github.com/woocommerce/woocommerce.git
+cd woocommerce
+
+# Install the correct Node.js version
+nvm install
+
+# Install all dependencies (this may take a few minutes)
+pnpm install
+
+# Build all packages and plugins
+pnpm build
+```
+
+<Info>
+The `pnpm install` command installs dependencies for all packages in the monorepo. The `pnpm build` command compiles TypeScript, bundles JavaScript, and prepares all packages for development.
+</Info>
+
+### Step 2: Start WordPress Environment
+
+Start a local WordPress development environment with WooCommerce:
+
+```bash
+# Navigate to the WooCommerce plugin directory
+cd plugins/woocommerce
+
+# Start the WordPress environment (requires Docker)
+pnpm -- wp-env start
+```
+
+<Note>
+First start will take 5-10 minutes as Docker downloads WordPress and sets up the database. Subsequent starts are much faster.
+</Note>
+
+Once started, access your development site:
+
+- **Site URL**: http://localhost:8888
+- **Admin URL**: http://localhost:8888/wp-admin
+- **Username**: `admin`
+- **Password**: `password`
+
+### Step 3: Make Your First Change
+
+Let's add a custom message to the WooCommerce product page:
+
+<Steps>
+  <Step title="Create a custom plugin">
+    Create a new file `plugins/woocommerce/.wordpress-org/local-plugins/wc-quickstart.php`:
+    
+    ```php
+    <?php
+    /**
+     * Plugin Name: WooCommerce Quickstart
+     * Description: My first WooCommerce customization
+     * Version: 1.0.0
+     */
+    
+    // Add a message after the product title
+    add_action( 'woocommerce_single_product_summary', function() {
+        echo '<p style="color: #843cfb; font-weight: bold;">'
+           . 'Custom message from my quickstart plugin!'
+           . '</p>';
+    }, 6 );
+    ```
+  </Step>
+  
+  <Step title="Activate the plugin">
+    Visit http://localhost:8888/wp-admin/plugins.php and activate "WooCommerce Quickstart".
+  </Step>
+  
+  <Step title="View your change">
+    Visit any product page at http://localhost:8888/shop/ and see your custom message appear below the product title!
+  </Step>
+</Steps>
+
+<Tip>
+**Congratulations!** You've just created your first WooCommerce customization using action hooks.
+</Tip>
+
+## What You Just Did
+
+Let's break down the hook you used:
+
+```php
+add_action( 'woocommerce_single_product_summary', function() {
+    // Your custom code
+}, 6 );
+```
+
+- **`add_action()`**: Hooks your function into a specific WooCommerce action
+- **`woocommerce_single_product_summary`**: The hook that fires on product pages
+- **Function**: Your custom code to execute
+- **`6`**: Priority (controls when your code runs relative to other hooked functions)
+
+<Info>
+WooCommerce has hundreds of hooks like this that let you customize every aspect of the store without modifying core code.
+</Info>
+
+## Next Steps
+
+Now that you have a working environment, here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card
+    title="Learn About Hooks"
+    icon="link"
+    href="/extensions/hooks-filters"
+  >
+    Master WooCommerce's extensive hook system
+  </Card>
+  
+  <Card
+    title="Build an Extension"
+    icon="puzzle-piece"
+    href="/extensions/first-extension"
+  >
+    Create a complete WooCommerce extension
+  </Card>
+  
+  <Card
+    title="Explore the REST API"
+    icon="code"
+    href="/api/rest-api/overview"
+  >
+    Integrate with products, orders, and customers
+  </Card>
+  
+  <Card
+    title="Theme Development"
+    icon="palette"
+    href="/themes/overview"
+  >
+    Customize the storefront appearance
+  </Card>
+</CardGroup>
+
+## Common Development Tasks
+
+### Running Tests
+
+```bash
+# Run PHP tests
+cd plugins/woocommerce
+pnpm test:php
+
+# Run JavaScript tests
+pnpm test:js
+```
+
+### Building Assets
+
+```bash
+# Build WooCommerce Core
+pnpm --filter='@woocommerce/plugin-woocommerce' build
+
+# Build all JavaScript packages
+pnpm --filter='./packages/js/*' build
+
+# Watch for changes (auto-rebuild)
+pnpm --filter='@woocommerce/plugin-woocommerce' start
+```
+
+### Working with wp-env
+
+```bash
+# Stop the environment
+pnpm -- wp-env stop
+
+# Restart the environment
+pnpm -- wp-env start
+
+# Destroy the environment (removes all data)
+pnpm -- wp-env destroy
+
+# Run WP-CLI commands
+pnpm -- wp-env run cli wp plugin list
+```
+
+## Troubleshooting
+
+<Accordion title="Port 8888 already in use">
+  Another application is using port 8888. Stop it or configure wp-env to use different ports by editing `.wp-env.json` in `plugins/woocommerce/`.
+</Accordion>
+
+<Accordion title="Docker not running">
+  wp-env requires Docker. Install [Docker Desktop](https://www.docker.com/products/docker-desktop) and ensure it's running before starting wp-env.
+</Accordion>
+
+<Accordion title="Build errors">
+  Try cleaning and reinstalling:
+  
+  ```bash
+  pnpm clean
+  pnpm install
+  pnpm build
+  ```
+</Accordion>
+
+<Accordion title="PHP errors">
+  Make sure you have all required PHP extensions:
+  
+  ```bash
+  php -m | grep -E 'mbstring|xml|curl|zip'
+  ```
+  
+  If any are missing, install them via your package manager.
+</Accordion>
+
+## Learn More
+
+<CardGroup cols={3}>
+  <Card
+    title="Development Environment"
+    icon="laptop-code"
+    href="/development-environment"
+  >
+    Detailed environment setup guide
+  </Card>
+  
+  <Card
+    title="Project Structure"
+    icon="folder-tree"
+    href="/project-structure"
+  >
+    Understanding the monorepo
+  </Card>
+  
+  <Card
+    title="Architecture"
+    icon="diagram-project"
+    href="/core-concepts/architecture"
+  >
+    Learn WooCommerce architecture
+  </Card>
+</CardGroup>
+
+## Get Help
+
+Stuck? Here's where to get help:
+
+- **[WooCommerce Slack](https://woocommerce.com/community-slack/)**: Join the developer community
+- **[GitHub Discussions](https://github.com/woocommerce/woocommerce/discussions)**: Ask questions and share ideas
+- **[Developer Blog](https://developer.woocommerce.com/blog/)**: Stay updated with development news
