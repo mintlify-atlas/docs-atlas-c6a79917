@@ -1,0 +1,145 @@
+{
+  "projectType": "framework",
+  "projectName": "WooCommerce",
+  "projectDescription": "A customizable, open-source ecommerce platform built on WordPress for building commerce solutions.",
+  "theme": "palm",
+  "primaryColor": "#843cfb",
+  "lightColor": "#c49cf2",
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "development-environment",
+              "project-structure"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/architecture",
+              "core-concepts/monorepo",
+              "core-concepts/modern-vs-legacy",
+              "core-concepts/dependency-injection"
+            ]
+          },
+          {
+            "group": "Extension Development",
+            "pages": [
+              "extensions/getting-started",
+              "extensions/first-extension",
+              "extensions/best-practices",
+              "extensions/settings-api",
+              "extensions/hooks-filters"
+            ]
+          },
+          {
+            "group": "Theme Development",
+            "pages": [
+              "themes/overview",
+              "themes/classic-themes",
+              "themes/block-themes",
+              "themes/customization"
+            ]
+          },
+          {
+            "group": "Block Development",
+            "pages": [
+              "blocks/getting-started",
+              "blocks/extensible-blocks",
+              "blocks/tutorials"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/payments",
+              "features/shipping",
+              "features/analytics",
+              "features/hpos",
+              "features/email"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "REST API",
+            "pages": [
+              "api/rest-api/overview",
+              "api/rest-api/authentication",
+              "api/rest-api/products",
+              "api/rest-api/orders",
+              "api/rest-api/customers"
+            ]
+          },
+          {
+            "group": "Store API",
+            "pages": [
+              "api/store-api/overview",
+              "api/store-api/cart",
+              "api/store-api/checkout"
+            ]
+          },
+          {
+            "group": "PHP APIs",
+            "pages": [
+              "api/php/payment-gateway-api",
+              "api/php/shipping-method-api",
+              "api/php/payment-token-api"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Contribution Guide",
+            "pages": [
+              "contributing/overview",
+              "contributing/coding-standards",
+              "contributing/testing",
+              "contributing/git-workflow"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "WordPress plugin ecosystem with extensive APIs",
+    "Payment Gateway API for custom payment methods",
+    "Shipping Method API for custom shipping integrations",
+    "REST API and Store API for headless commerce",
+    "Block development for Gutenberg integration",
+    "High-Performance Order Storage (HPOS)",
+    "Analytics and reporting system",
+    "Theme customization framework",
+    "Extension hooks and filters system",
+    "WooCommerce CLI tools"
+  ],
+  "publicApiSurface": [
+    "WC() - Main WooCommerce instance",
+    "WC REST API v3 endpoints",
+    "Store API endpoints",
+    "WC_Payment_Gateway class",
+    "WC_Shipping_Method class",
+    "WC_Settings_API class",
+    "woocommerce_* action hooks",
+    "woocommerce_* filter hooks",
+    "WC_Order class",
+    "WC_Product class",
+    "WC_Customer class",
+    "@woocommerce/* npm packages",
+    "WooCommerce CLI commands"
+  ]
+}
